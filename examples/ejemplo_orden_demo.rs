@@ -75,11 +75,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 3) El caché del resultado se consulta sin latencia de red.
     println!("caché: {:?}", broker.get_operation_result(&id).await?);
 
+    // 4) El bróker acredita el resultado un instante después del cierre: se
+    //    espera el evento de balance. Leerlo al instante mostraría solo el
+    //    stake descontado y daría un delta engañoso.
+    let mut acreditado = false;
+    let limite = tokio::time::Instant::now() + Duration::from_secs(20);
+    while tokio::time::Instant::now() < limite {
+        match tokio::time::timeout(Duration::from_secs(5), eventos.next()).await {
+            Ok(Some(Event::BalanceChanged(_))) => {
+                acreditado = true;
+                break;
+            }
+            Ok(Some(_)) => continue,
+            Ok(None) => break,
+            Err(_) => continue,
+        }
+    }
+
     let despues = broker.get_balance().await?;
     println!(
-        "balance final {} (delta {})",
+        "balance final {} (delta {}){}",
         despues.amount,
-        despues.amount - antes.amount
+        despues.amount - antes.amount,
+        if acreditado {
+            ""
+        } else {
+            " — el bróker aún no había notificado el crédito"
+        }
     );
 
     broker.disconnect().await?;
