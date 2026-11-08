@@ -233,6 +233,21 @@ documentó, en particular en la API original de IQ Option publicada en GitHub.
 Este proyecto es una implementación desde cero: no incluye código de aquella ni
 la usa como dependencia.
 
+## ❤️ Apoyar el proyecto
+
+El proyecto es gratuito y se mantiene sin patrocinadores. Si te resulta útil y
+quieres contribuir a sostenerlo, puedes enviar una donación por Binance Pay.
+Es totalmente opcional: no desbloquea funciones, no cambia la prioridad de los
+issues y no condiciona el soporte.
+
+<img src="https://raw.githubusercontent.com/ionixcorp/cripsy_binary_API/master/docs/assets/donacion-binance.png" alt="Código QR de Binance Pay para donaciones" width="220">
+
+**Alias de Binance Pay:** `CripSy-AGKY`
+
+Contribuir no pasa solo por el dinero: un informe de error con pasos para
+reproducirlo, una corrección en la documentación o un pull request ayudan
+igual o más.
+
 ## ⚠️ Aviso
 
 Este software no constituye asesoría financiera. Operar opciones binarias
