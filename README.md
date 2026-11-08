@@ -120,7 +120,9 @@ exige, está en **[`docs/`](docs/)**:
 | [Herramientas](docs/07_herramientas/01_herramientas.es.md) | Instalación, scripts y cómo añadir un bróker |
 | [Indicadores](docs/08_indicadores/01_indicadores.es.md) | Estado real del canal de indicadores |
 
-**Ver la documentación navegable** (un solo HTML, sin dependencias):
+**Documentación en línea:** <https://ionixcorp.github.io/cripsy_binary_API/>
+
+**Verla en local** (un solo HTML, sin dependencias):
 
 ```powershell
 .\scripts\build_docs.ps1 -Lang es    # genera docs/site/es/index.html
