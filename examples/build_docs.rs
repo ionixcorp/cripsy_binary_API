@@ -1,8 +1,9 @@
 //! Generador de documentación navegable (single-file HTML, sin Node ni red).
 //!
 //! Lee `docs/**/*.<lang>.md` y produce `docs/site/<lang>/index.html`
-//! con sidebar, routing por hash y búsqueda. La fuente de verdad sigue siendo
-//! Markdown; el HTML es generado (nunca se edita a mano).
+//! con sidebar, índice de la página (TOC), routing por hash y búsqueda.
+//! La fuente de verdad sigue siendo Markdown; el HTML es generado (nunca se
+//! edita a mano).
 //!
 //! Uso: `cargo run --example build_docs -- --lang es`
 //! PowerShell: `.\scripts\build_docs.ps1 -Lang es`
@@ -11,12 +12,17 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+/// Proyecto publicado, usado en la cabecera y el pie del sitio.
+const REPO: &str = "https://github.com/ionixcorp/cripsy_binary_API";
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 #[derive(Clone)]
 struct Pagina {
     id: String,
     titulo: String,
     grupo: String,
     html: String,
+    toc: String,
 }
 
 fn esc(t: &str) -> String {
@@ -262,6 +268,76 @@ fn slug(path: &Path, lang: &str) -> String {
         .to_lowercase()
 }
 
+/// Ancla estable a partir del texto visible de un encabezado.
+fn slug_texto(t: &str) -> String {
+    let mut s = String::new();
+    let mut guion = false;
+    for c in t.chars() {
+        let c = c.to_lowercase().next().unwrap_or(c);
+        if c.is_alphanumeric() {
+            s.push(c);
+            guion = false;
+        } else if !guion && !s.is_empty() {
+            s.push('-');
+            guion = true;
+        }
+    }
+    s.trim_matches('-').to_string()
+}
+
+/// Quita etiquetas y entidades para usar el texto como ancla.
+fn sin_etiquetas(t: &str) -> String {
+    let mut s = String::new();
+    let mut dentro = false;
+    for c in t.chars() {
+        match c {
+            '<' => dentro = true,
+            '>' => dentro = false,
+            c if !dentro => s.push(c),
+            _ => {}
+        }
+    }
+    s.replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+}
+
+/// Añade `id` a los `h2`/`h3` y devuelve el HTML con anclas y el índice de la
+/// página (TOC) que se muestra en la columna derecha.
+fn ids_y_toc(html: &str) -> (String, String) {
+    let mut salida = String::with_capacity(html.len() + 512);
+    let mut toc = String::new();
+    let mut resto = html;
+    let mut n = 0usize;
+    loop {
+        let encontrado = [("h2", "<h2>"), ("h3", "<h3>")]
+            .iter()
+            .filter_map(|(tag, marca)| resto.find(marca).map(|p| (p, *tag, *marca)))
+            .min_by_key(|(p, _, _)| *p);
+        let Some((pos, tag, marca)) = encontrado else {
+            salida.push_str(resto);
+            break;
+        };
+        let cierre = format!("</{tag}>");
+        let inicio = pos + marca.len();
+        let Some(fin_rel) = resto[inicio..].find(&cierre) else {
+            salida.push_str(resto);
+            break;
+        };
+        let fin = inicio + fin_rel;
+        let texto = &resto[inicio..fin];
+        n += 1;
+        let id = format!("s{n}-{}", slug_texto(&sin_etiquetas(texto)));
+        salida.push_str(&resto[..pos]);
+        salida.push_str(&format!("<{tag} id=\"{id}\">{texto}</{tag}>"));
+        let clase = format!("toc-{}", tag.trim_start_matches('h'));
+        toc.push_str(&format!("<a class=\"{clase}\" href=\"#{id}\">{texto}</a>"));
+        resto = &resto[fin + cierre.len()..];
+    }
+    (salida, toc)
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let mut lang = "es".to_string();
@@ -329,12 +405,13 @@ fn main() {
                     .unwrap_or(&nombre)
                     .replace('_', " ")
             });
-        let html = md_a_html(&md);
+        let (html, toc) = ids_y_toc(&md_a_html(&md));
         paginas.push(Pagina {
             id,
             titulo,
             grupo,
             html,
+            toc,
         });
     }
 
@@ -388,63 +465,121 @@ fn main() {
         .collect::<Vec<_>>()
         .join(",");
 
+    let tocs_json: String = paginas
+        .iter()
+        .map(|p| format!("\"{}\":{}", p.id, serde_json_string(&p.toc)))
+        .collect::<Vec<_>>()
+        .join(",");
+
     let html = format!(
-        r#"<!DOCTYPE html>
+        r##"<!DOCTYPE html>
 <html lang="{lang}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>cripsy_binary_API — Documentación</title>
+<meta name="description" content="Documentación de cripsy_binary_API: cliente Rust para la API de IQ Option.">
 <style>
-:root {{ --bg:#0f1117; --panel:#171a23; --borde:#232838; --texto:#e6e9f0; --suave:#9aa3b5; --acento:#5aa9ff; --codigo:#0b0d13; }}
-* {{ box-sizing:border-box; }}
-body {{ margin:0; font-family:"Segoe UI",system-ui,-apple-system,sans-serif; background:var(--bg); color:var(--texto); display:flex; min-height:100vh; }}
-nav {{ width:320px; flex:0 0 320px; background:var(--panel); border-right:1px solid var(--borde); padding:16px; overflow-y:auto; position:sticky; top:0; height:100vh; }}
-nav h1 {{ font-size:15px; margin:0 0 4px; color:var(--acento); }}
-nav .sub {{ font-size:12px; color:var(--suave); margin-bottom:14px; }}
-#buscador {{ width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--borde); background:var(--codigo); color:var(--texto); margin-bottom:12px; }}
-.nav-grupo {{ margin-bottom:14px; }}
-.nav-titulo {{ font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--suave); margin:6px 0; }}
-.nav-item {{ display:block; padding:6px 8px; border-radius:6px; color:var(--texto); text-decoration:none; font-size:13px; }}
-.nav-item:hover {{ background:#1e2433; }}
-.nav-item.activo {{ background:#22314f; color:var(--acento); }}
-main {{ flex:1; padding:32px 44px; max-width:1000px; }}
+:root {{ --bg:#0b0e14; --panel:#11151f; --panel2:#151b28; --borde:#1f2736; --texto:#dde3ee; --suave:#8d97a8; --acento:#6aa8ff; --codigo:#0a0d13; }}
+*, *::before, *::after {{ box-sizing:border-box; }}
+html {{ scroll-behavior:smooth; }}
+body {{ margin:0; background:var(--bg); color:var(--texto); font-family:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",sans-serif; font-size:15px; line-height:1.6; display:grid; grid-template-columns:296px minmax(0,1fr) 264px; grid-template-rows:56px 1fr auto; min-height:100vh; }}
+header.topbar {{ grid-column:1 / -1; display:flex; align-items:center; gap:14px; padding:0 22px; background:linear-gradient(180deg,#121826,#0e131d); border-bottom:1px solid var(--borde); position:sticky; top:0; z-index:20; }}
+.marca {{ display:flex; align-items:center; gap:9px; font-weight:600; letter-spacing:.2px; color:var(--texto); text-decoration:none; }}
+.marca .punto {{ width:9px; height:9px; border-radius:50%; background:var(--acento); box-shadow:0 0 12px var(--acento); }}
+.marca .ver {{ font-size:11px; font-weight:500; color:var(--suave); border:1px solid var(--borde); border-radius:999px; padding:1px 8px; }}
+header.topbar .sep {{ flex:1; }}
+header.topbar a.enlace {{ font-size:13px; color:var(--suave); text-decoration:none; padding:6px 10px; border-radius:8px; }}
+header.topbar a.enlace:hover {{ color:var(--texto); background:#1a2130; }}
+#menu-movil {{ display:none; }}
+nav {{ grid-column:1; grid-row:2 / span 2; background:var(--panel); border-right:1px solid var(--borde); padding:18px 14px 28px; position:sticky; top:56px; align-self:start; height:calc(100vh - 56px); overflow-y:auto; }}
+nav .rotulo {{ font-size:11px; text-transform:uppercase; letter-spacing:.1em; color:var(--suave); margin:0 0 10px 4px; }}
+#buscador {{ width:100%; padding:9px 11px; border-radius:9px; border:1px solid var(--borde); background:var(--codigo); color:var(--texto); margin-bottom:14px; }}
+#buscador:focus {{ outline:none; border-color:var(--acento); box-shadow:0 0 0 3px rgba(106,168,255,.15); }}
+.nav-grupo {{ margin-bottom:16px; }}
+.nav-titulo {{ font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--suave); margin:8px 0 6px 4px; }}
+.nav-item {{ display:block; padding:7px 10px; border-radius:8px; color:#c3cbd9; text-decoration:none; font-size:13.5px; border-left:2px solid transparent; }}
+.nav-item:hover {{ background:var(--panel2); color:var(--texto); }}
+.nav-item.activo {{ background:#1b2740; color:var(--acento); border-left-color:var(--acento); }}
+main {{ grid-column:2; padding:34px 46px 64px; max-width:900px; }}
 .pagina {{ display:none; }}
-.pagina.activa {{ display:block; }}
-h1.titulo-pagina {{ font-size:26px; border-bottom:2px solid var(--borde); padding-bottom:8px; }}
-h2 {{ font-size:20px; margin-top:28px; }}
-h3 {{ font-size:17px; }}
-p, li {{ line-height:1.65; font-size:14.5px; }}
-blockquote {{ border-left:3px solid var(--acento); margin:12px 0; padding:6px 14px; background:#141a28; color:var(--suave); }}
-pre.code {{ background:var(--codigo); border:1px solid var(--borde); border-radius:8px; padding:12px; overflow-x:auto; font-size:13px; }}
-code {{ font-family:"Cascadia Code",Consolas,monospace; background:#1b2030; border-radius:4px; padding:1px 5px; font-size:13px; }}
-pre code {{ background:none; padding:0; }}
-table {{ border-collapse:collapse; margin:12px 0; width:100%; font-size:13.5px; }}
-th, td {{ border:1px solid var(--borde); padding:7px 10px; text-align:left; }}
-th {{ background:#1b2030; }}
-a {{ color:var(--acento); }}
-.idiomas {{ margin-bottom:10px; font-size:13px; }}
-.idiomas a {{ margin-right:10px; }}
-@media (max-width:900px) {{ nav {{ display:none; }} }}
+.pagina.activa {{ display:block; animation:aparece .18s ease-out; }}
+@keyframes aparece {{ from {{ opacity:0; transform:translateY(4px); }} to {{ opacity:1; transform:none; }} }}
+h1.titulo-pagina {{ font-size:28px; line-height:1.25; margin:0 0 22px; padding-bottom:14px; border-bottom:1px solid var(--borde); }}
+h2 {{ font-size:20px; margin:32px 0 12px; scroll-margin-top:72px; }}
+h3 {{ font-size:16.5px; margin:24px 0 10px; color:#e8edf7; scroll-margin-top:72px; }}
+p, li {{ font-size:14.5px; color:#cfd6e4; }}
+blockquote {{ border-left:3px solid var(--acento); background:#0f1622; margin:16px 0; padding:10px 16px; border-radius:0 8px 8px 0; color:#b9c2d2; }}
+pre.code {{ background:var(--codigo); border:1px solid var(--borde); border-left:3px solid #2f57a0; border-radius:10px; padding:14px 16px; overflow-x:auto; font-size:13px; line-height:1.55; }}
+code {{ font-family:"Cascadia Code",Consolas,"SF Mono",monospace; background:#161d2b; border:1px solid #222c3d; border-radius:5px; padding:1px 5px; font-size:12.8px; }}
+pre code {{ background:none; border:none; padding:0; }}
+table {{ border-collapse:separate; border-spacing:0; margin:16px 0; width:100%; font-size:13.5px; border:1px solid var(--borde); border-radius:10px; overflow:hidden; }}
+th, td {{ padding:9px 12px; text-align:left; border-bottom:1px solid var(--borde); vertical-align:top; }}
+th {{ background:#161d2b; color:#e8edf7; font-weight:600; }}
+tr:last-child td {{ border-bottom:none; }}
+table tr:nth-child(even) td {{ background:#0e141f; }}
+a {{ color:var(--acento); text-decoration:none; }}
+a:hover {{ text-decoration:underline; }}
+hr {{ border:none; border-top:1px solid var(--borde); margin:26px 0; }}
+aside.toc {{ grid-column:3; grid-row:2; position:sticky; top:56px; align-self:start; height:calc(100vh - 56px); overflow-y:auto; padding:26px 18px 40px; border-left:1px solid var(--borde); background:rgba(17,21,31,.55); }}
+.toc-titulo {{ font-size:11px; text-transform:uppercase; letter-spacing:.1em; color:var(--suave); margin:0 0 10px; }}
+#toc a {{ display:block; padding:5px 0 5px 12px; color:#a9b3c4; font-size:13px; border-left:2px solid var(--borde); }}
+#toc a:hover {{ color:var(--texto); border-left-color:var(--acento); text-decoration:none; }}
+#toc a.toc-3 {{ padding-left:24px; font-size:12.5px; color:#8d97a8; }}
+.toc-vacio {{ font-size:13px; color:var(--suave); }}
+.toc-bloque {{ margin-top:26px; padding-top:18px; border-top:1px solid var(--borde); }}
+.toc-bloque a {{ display:block; font-size:13px; color:#a9b3c4; padding:4px 0; }}
+footer {{ grid-column:1 / -1; display:flex; gap:18px; flex-wrap:wrap; align-items:center; padding:18px 22px; border-top:1px solid var(--borde); background:var(--panel); color:var(--suave); font-size:12.5px; }}
+footer a {{ color:var(--suave); }}
+footer code {{ font-size:12px; }}
+@media (max-width:1120px) {{ body {{ grid-template-columns:1fr; }} nav, aside.toc {{ display:none; }} main {{ grid-column:1; padding:24px 20px 48px; }} header.topbar {{ padding:0 14px; }} #menu-movil {{ display:block; flex:1; max-width:320px; padding:7px 10px; border-radius:8px; border:1px solid var(--borde); background:var(--codigo); color:var(--texto); }} header.topbar a.enlace {{ display:none; }} }}
+@media print {{ nav, aside.toc, header.topbar, footer {{ display:none; }} main {{ max-width:none; }} }}
 </style>
 </head>
 <body>
+<header class="topbar">
+  <a class="marca" href="#{primero}"><span class="punto"></span>cripsy_binary_API <span class="ver">v{version}</span></a>
+  <select id="menu-movil" aria-label="Ir a una pagina"></select>
+  <span class="sep"></span>
+  <a class="enlace" href="{repo}">Repositorio</a>
+  <a class="enlace" href="{repo}/tree/master/docs">Markdown</a>
+</header>
 <nav>
-  <h1>cripsy_binary_API</h1>
-  <div class="sub">API moderna para brókers de opciones binarias</div>
-  <input id="buscador" type="search" placeholder="Buscar en la documentación…">
+  <div class="rotulo">Documentación</div>
+  <input id="buscador" type="search" placeholder="Buscar…" aria-label="Buscar en la documentacion">
   <div id="nav">{nav_html}</div>
 </nav>
 <main id="contenido">{contenido_html}</main>
+<aside class="toc">
+  <div class="toc-titulo">En esta página</div>
+  <div id="toc"></div>
+  <div class="toc-bloque">
+    <div class="toc-titulo">Enlaces</div>
+    <a href="{repo}">Repositorio en GitHub ↗</a>
+    <a href="{repo}/tree/master/installation">Instalación</a>
+    <a href="{repo}/tree/master/scripts">Scripts de verificación</a>
+  </div>
+</aside>
+<footer>
+  <span>cripsy_binary_API · v{version} · MIT</span>
+  <a href="{repo}">github.com/ionixcorp/cripsy_binary_API</a>
+  <span>Generado desde Markdown en <code>docs/</code></span>
+</footer>
 <script>
 var DOCS = [{busqueda_json}];
+var TOCS = {{{tocs_json}}};
 function mostrar(id) {{
+  var seccion = document.getElementById(id);
+  if (!seccion) {{ return; }}
   document.querySelectorAll('.pagina').forEach(function(s) {{ s.classList.remove('activa'); }});
   document.querySelectorAll('.nav-item').forEach(function(a) {{ a.classList.remove('activo'); }});
-  var sec = document.getElementById(id);
+  seccion.classList.add('activa');
   var enlace = document.querySelector('.nav-item[data-id="' + id + '"]');
-  if (sec) {{ sec.classList.add('activa'); }}
   if (enlace) {{ enlace.classList.add('activo'); enlace.scrollIntoView({{ block:'nearest' }}); }}
+  var caja = document.getElementById('toc');
+  caja.innerHTML = TOCS[id] || '<div class="toc-vacio">Esta página no tiene secciones.</div>';
+  var selector = document.getElementById('menu-movil');
+  if (selector) {{ selector.value = id; }}
   window.scrollTo(0, 0);
 }}
 document.querySelectorAll('.nav-item').forEach(function(a) {{
@@ -464,7 +599,28 @@ document.getElementById('buscador').addEventListener('input', function(e) {{
     a.style.display = visible ? 'block' : 'none';
   }});
 }});
-window.addEventListener('hashchange', function() {{
+document.getElementById('toc').addEventListener('click', function(e) {{
+  var a = e.target.closest('a');
+  if (!a) {{ return; }}
+  e.preventDefault();
+  var destino = document.getElementById(a.getAttribute('href').slice(1));
+  if (destino) {{ destino.scrollIntoView({{ behavior:'smooth', block:'start' }}); }}
+}});
+(function () {{
+  var selector = document.getElementById('menu-movil');
+  if (!selector) {{ return; }}
+  DOCS.forEach(function(d) {{
+    var opcion = document.createElement('option');
+    opcion.value = d.id;
+    opcion.textContent = d.t;
+    selector.appendChild(opcion);
+  }});
+  selector.addEventListener('change', function () {{
+    location.hash = selector.value;
+    mostrar(selector.value);
+  }});
+}})();
+window.addEventListener('hashchange', function () {{
   mostrar(location.hash.replace('#','') || '{primero}');
 }});
 var primero = '{primero}';
@@ -472,11 +628,14 @@ if (location.hash) {{ mostrar(location.hash.replace('#','')); }} else {{ mostrar
 </script>
 </body>
 </html>
-"#,
+"##,
         lang = lang,
+        version = VERSION,
+        repo = REPO,
         nav_html = nav_html,
         contenido_html = contenido_html,
         busqueda_json = busqueda_json,
+        tocs_json = tocs_json,
         primero = paginas
             .first()
             .map(|p| p.id.clone())

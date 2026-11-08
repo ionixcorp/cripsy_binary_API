@@ -1,8 +1,11 @@
 # cripsy_binary_API
 
+![cripsy_binary_API: cliente Rust para la API de IQ Option](https://raw.githubusercontent.com/ionixcorp/cripsy_binary_API/master/docs/assets/banner.svg)
+
 [![Licencia: MIT](https://img.shields.io/badge/licencia-MIT-blue.svg)](LICENSE)
 [![Rust 1.86+](https://img.shields.io/badge/rust-1.86%2B-orange.svg)](https://www.rust-lang.org)
 [![Documentación](https://img.shields.io/badge/docs-GitHub%20Pages-blue.svg)](https://ionixcorp.github.io/cripsy_binary_API/)
+[![CI](https://github.com/ionixcorp/cripsy_binary_API/actions/workflows/ci.yml/badge.svg)](https://github.com/ionixcorp/cripsy_binary_API/actions)
 
 Librería cliente en Rust para la API de IQ Option. Proporciona una interfaz para
 la sesión, el catálogo de activos, las velas históricas, el stream de velas y
