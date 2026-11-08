@@ -1,10 +1,8 @@
 # cripsy_binary_API
 
-[![crates.io](https://img.shields.io/crates/v/cripsy-binary-api.svg)](https://crates.io/crates/cripsy-binary-api)
 [![Licencia: MIT](https://img.shields.io/badge/licencia-MIT-blue.svg)](LICENSE)
 [![Rust 1.86+](https://img.shields.io/badge/rust-1.86%2B-orange.svg)](https://www.rust-lang.org)
 [![Documentación](https://img.shields.io/badge/docs-GitHub%20Pages-blue.svg)](https://ionixcorp.github.io/cripsy_binary_API/)
-[![CI](https://github.com/ionixcorp/cripsy_binary_API/actions/workflows/ci.yml/badge.svg)](https://github.com/ionixcorp/cripsy_binary_API/actions)
 
 Librería cliente en Rust para la API de IQ Option. Proporciona una interfaz para
 la sesión, el catálogo de activos, las velas históricas, el stream de velas y
@@ -88,14 +86,7 @@ operaciones de otros usuarios del instrumento.
 
 ## 📦 Instalación
 
-Desde crates.io:
-
-```toml
-[dependencies]
-cripsy-binary-api = "0.1"
-```
-
-Desde el repositorio:
+Instalación desde el repositorio:
 
 ```powershell
 git clone https://github.com/ionixcorp/cripsy_binary_API.git
@@ -200,8 +191,8 @@ Las propuestas y discusiones se atienden en los issues del repositorio.
 .\scripts\verify.ps1   # fmt + clippy -D warnings + 61 tests + build blocking + docs
 ```
 
-El workflow de GitHub Actions repite esa compuerta en Linux y Windows. Los tests
-no acceden a la red ni requieren credenciales.
+La compuerta es la misma que se ejecuta en Windows y en Linux. Los tests no
+acceden a la red ni requieren credenciales.
 
 ## 🛡️ Seguridad
 
