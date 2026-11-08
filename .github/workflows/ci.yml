@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  calidad:
+    name: Calidad (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Formato
+        run: cargo fmt --check
+      - name: Clippy sin warnings
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Tests
+        run: cargo test
+      - name: Build variante blocking
+        run: cargo build --no-default-features --features blocking
+
+  documentacion:
+    name: Documentacion navegable
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Generar HTML
+        run: cargo run --quiet --example build_docs -- --lang es --out docs/site
+      - uses: actions/upload-artifact@v4
+        with:
+          name: docs-site
+          path: docs/site
