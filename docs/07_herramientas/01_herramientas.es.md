@@ -3,7 +3,8 @@
 Todo lo necesario para instalar, verificar y desarrollar está en tres lugares:
 
 - `installation/` — instalación guiada y verificación del entorno.
-- `scripts/` — compuerta de calidad y generación de la documentación.
+- `scripts/` — compuerta de calidad, generación de la documentación y scripts
+  listos para usar contra el bróker.
 - `examples/` — uso real de la API (lectura, consumo sincrónico y una orden demo).
 
 ## Instalación guiada
@@ -50,6 +51,26 @@ Convierte `docs/**/*.es.md` en un único HTML navegable en `docs/site/es/`. El
 punto de entrada es `index.html` en la raíz del proyecto. El Markdown es la
 fuente de verdad; el HTML es generado y nunca se edita a mano.
 
+Para leerlo: en VS Code instala la extensión **Live Server** (Go Live) y pulsa
+*Go Live* sobre el `index.html`; o abre el archivo con doble clic, porque
+funciona también sin servidor (`file://`, navegación por hash y sin `fetch`).
+
+## Scripts listos para usar
+
+Todas leen tus credenciales de `.env` y operan en cuenta **demo**:
+
+| Script | Qué hace |
+|---|---|
+| `scripts\conectar.ps1` | Sesión, balance, catálogo, velas y stream (solo lectura) |
+| `scripts\balance.ps1` | Balance, tipo de cuenta y `balance_id` |
+| `scripts\operar.ps1` | Orden de 1 USD en demo y cierre por evento (pide confirmación) |
+| `scripts\verificar_todo.ps1` | Valida **todas** las capacidades documentadas y reporta `[OK]`/`[FALLO]` |
+
+```powershell
+.\scripts\verificar_todo.ps1              # incluye órdenes demo
+.\scripts\verificar_todo.ps1 -SoloLectura # sin enviar órdenes
+```
+
 ## Probar contra el bróker
 
 Los ejemplos leen las credenciales del entorno y operan en cuenta demo:
@@ -58,6 +79,7 @@ Los ejemplos leen las credenciales del entorno y operan en cuenta demo:
 cargo run --example ejemplo_lectura     # sesión, catálogo, velas y stream
 cargo run --example ejemplo_sincrono    # el mismo consumo, bloqueante
 cargo run --example ejemplo_orden_demo  # compra demo y cierre por evento
+cargo run --example verificar_todo      # verificación integral
 ```
 
 `ejemplo_orden_demo` mueve saldo de práctica: ejecútalo solo si eres el dueño de

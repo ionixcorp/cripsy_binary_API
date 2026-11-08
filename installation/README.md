@@ -52,10 +52,20 @@ Solo informa del estado y no instala ni escribe nada.
 # documentación navegable (regenerar)
 ..\scripts\build_docs.ps1 -Lang es
 
-# ejemplos de uso
-cargo run --example ejemplo_lectura
-cargo run --example ejemplo_sincrono
+# scripts listos para usar (leen .env y operan en demo)
+.\..\scripts\conectar.ps1
+.\..\scripts\balance.ps1
+.\..\scripts\verificar_todo.ps1 -SoloLectura
 ```
+
+## Ver la documentación navegable
+
+El instalador genera `docs/site/es/index.html`. Para leerlo:
+
+- **VS Code:** instala la extensión **Live Server** (Go Live) y pulsa *Go Live*
+  sobre `index.html` (raíz del proyecto) o sobre `docs/site/es/index.html`.
+- **Manual:** abre `docs/site/es/index.html` con doble clic. Funciona también
+  sin servidor: la navegación es por hash y no usa `fetch`.
 
 ## Notas
 
