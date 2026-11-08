@@ -1,63 +1,101 @@
 # cripsy_binary_API
 
+[![crates.io](https://img.shields.io/crates/v/cripsy-binary-api.svg)](https://crates.io/crates/cripsy-binary-api)
 [![Licencia: MIT](https://img.shields.io/badge/licencia-MIT-blue.svg)](LICENSE)
 [![Rust 1.86+](https://img.shields.io/badge/rust-1.86%2B-orange.svg)](https://www.rust-lang.org)
-[![Versión](https://img.shields.io/badge/versi%C3%B3n-0.1.0-informational.svg)](Cargo.toml)
+[![Documentación](https://img.shields.io/badge/docs-GitHub%20Pages-blue.svg)](https://ionixcorp.github.io/cripsy_binary_API/)
 [![CI](https://github.com/ionixcorp/cripsy_binary_API/actions/workflows/ci.yml/badge.svg)](https://github.com/ionixcorp/cripsy_binary_API/actions)
 
-**La API en Rust para operar opciones binarias con datos y eventos en tiempo
-real.** Un núcleo `async` y una fachada bloqueante sobre el mismo motor, dominio
-tipado de extremo a extremo y **cero polling**: todo llega por eventos.
+Librería cliente en Rust para la API de IQ Option. Proporciona una interfaz para
+la sesión, el catálogo de activos, las velas históricas, el stream de velas y
+ticks, y el envío de órdenes clásicas, digitales y blitz. El mismo motor se
+ofrece como núcleo `async` y como fachada bloqueante.
 
-Gratuita, de código abierto (MIT) y sin dependencias heredadas. Se consume como
-librería.
+Los resultados de las operaciones se entregan como eventos; existe una consulta
+puntual como respaldo.
 
 ```rust
 let broker = IqOptionBroker::nuevo(BrokerParams::IqOption(cfg)).await?;
-let orden  = broker.buy_binary(BuyBinaryRequest {
-    symbol: "EURUSD-OTC".into(), amount: 1.0, direction: Direction::Call,
-    expiration_minutes: 1, option_type: OptionType::Binary,
+
+let id = broker.buy_binary(BuyBinaryRequest {
+    symbol: "EURUSD-OTC".into(),
+    amount: 1.0,
+    direction: Direction::Call,
+    expiration_minutes: 1,
+    option_type: OptionType::Binary,
 }).await?;
 
-// El resultado llega solo, como evento. Sin bucles, sin sleeps.
-while let Some(Event::OrderClosed { id, result }) = broker.events().await?.next().await {
-    println!("orden {id}: {result:?}");
-    break;
+// El cierre llega por el stream de eventos.
+let mut eventos = broker.events().await?;
+while let Some(evento) = eventos.next().await {
+    if let Event::OrderClosed { id: cerrada, result } = evento {
+        if cerrada == id {
+            println!("orden {id}: {result:?}");
+            break;
+        }
+    }
 }
 ```
 
-## 🚀 Qué puedes hacer con ella
+## 📌 Estado del proyecto
 
-| | Capacidad | Detalle |
+Versión `0.1.0`. Cada componente se probó mediante conexiones reales contra el
+bróker (cuenta de práctica) el 8 de noviembre de 2026:
+
+| Componente | Estado | Comprobación |
 |---|---|---|
-| 🔐 | **Sesión completa** | Login, WebSocket, perfil, balances con saldo retenido/bonos y cambio demo ↔ real en caliente |
-| 📊 | **791 activos** | Catálogo vivo con payout, duraciones, mínimos/máximos, sector, proveedor y horarios |
-| 🌍 | **Mercados reales** | 248 forex · 165 cripto · 165 acciones · 102 índices · 62 materias primas (medido contra el bróker) |
-| 🎚️ | **Tres grupos operables** | Clásicas (turbo/binary), **blitz** con duraciones en segundos y **digitales v2** |
-| 🕯️ | **Velas históricas** | De 1 segundo a 1 día · hasta 7 días en 1 s · descarga paginada con detección de huecos |
-| ⚡ | **Stream sin polling** | Velas multi-tamaño y **ticks nativos ~3/s por activo**; 75 activos en una sola sesión |
-| 🎯 | **Cuatro tipos de orden** | Clásicas (turbo/binary), digitales v2, **blitz v2** y venta anticipada (buyback) |
-| 📈 | **Resultado por evento** | Cierre tipado (`Win`/`Loss`/`Equal`) con caché consultable sin latencia de red |
-| 🧾 | **Analítica de cuenta** | Historial de posiciones con PnL realizado, invertido y apalancamiento |
-| 🌐 | **Datos de plataforma** | Perfil fundamental del activo (nombre, ticker, variaciones), operaciones de terceros (live-deal) y cambios de comisión |
-| 🧠 | **Señales del bróker** | Humor de traders y activos más populares, emitidos como eventos |
-| 🔁 | **Dos formas de consumo** | `async`/`await` o `SyncBroker` bloqueante, mismo núcleo |
-| 🧩 | **Multibróker** | Trait `Broker` + registro de adaptadores: añadir un bróker no toca dominio ni transporte |
-| 🛡️ | **Uso responsable** | Revisor de configuración con avisos (TLS, timeouts, cuenta real) y texto de garantía listo para mostrar |
+| Conexión y sesión | Probado contra el bróker | Login, perfil y balances |
+| Catálogo de activos | Probado contra el bróker | 791 activos con metadatos |
+| Velas históricas | Probado contra el bróker | 1 s – 1 día, descarga paginada |
+| Stream de velas | Probado contra el bróker | Velas en vivo por suscripción |
+| Ticks de precio | Probado contra el bróker | Stream nativo por activo |
+| Órdenes clásicas | Probado contra el bróker | Resultado por evento y caché |
+| Órdenes digitales | Probado contra el bróker | Cierre por evento |
+| Órdenes blitz | Probado contra el bróker | Duraciones en segundos |
+| Venta anticipada | Probado contra el bróker | Aceptada dentro de la ventana |
+| Perfil de activo (GraphQL) | Probado contra el bróker | Nombre, ticker y variaciones |
+| Historial de posiciones | Probado contra el bróker | PnL realizado y apalancamiento |
+| Indicadores del bróker | Depende del activo | El bróker rechaza algunos activos |
+| Canales de plataforma | Probado contra el bróker | Comisiones y live-deal |
 
-### Por qué no es «una más»
+Los detalles, límites y casos no soportados están en
+[`docs/01_introduccion.es.md`](docs/01_introduccion.es.md).
 
-- **Nada de polling.** Cada petición se correlaciona por `request_id` y los
-  resultados llegan por eventos. No hay `while` preguntando «¿ya cerró?».
-- **Datos que otras APIs no exponen:** metadatos operativos por activo (ventana
-  de buyback, deadtime, proveedor de precio, rollovers de blitz), perfil
-  fundamental vía GraphQL, comisiones en vivo y operaciones de terceros.
-- **Dominio tipado:** `OrderId`, `Payout`, `Position`, `Asset`… nada de
-  diccionarios crudos en la frontera pública.
-- **Blitz de verdad:** duraciones en segundos con `expired` alineado y
-  resolución del activo contra el grupo correcto del catálogo.
+## 🧩 Funcionalidades
+
+La librería incluye las siguientes funcionalidades:
+
+| | Área | Descripción |
+|---|---|---|
+| 🔐 | Sesión | Autenticación, WebSocket, perfil y balances (incluye saldo retenido y bonos); cambio entre cuenta de práctica y real en caliente |
+| 📊 | Catálogo | Activos con payout, duraciones, importes mínimo y máximo, sector, proveedor de precio y horarios |
+| 🕯️ | Velas históricas | Intervalos de 1 segundo a 1 día; consulta puntual por rango y descarga paginada con detección de huecos |
+| ⚡ | Stream | Suscripción a velas por intervalo y recepción de ticks nativos del activo |
+| 🎯 | Órdenes | Clásicas (turbo y binary), digitales v2, blitz v2 y venta anticipada (buyback) |
+| 📈 | Resultados | Cierre tipado (`Win`, `Loss`, `Equal`) por evento, con caché consultable |
+| 🧾 | Historial | Posiciones cerradas con PnL realizado, importe invertido y apalancamiento |
+| 🌐 | Datos de plataforma | Perfil fundamental del activo, comisiones en vivo y operaciones de terceros |
+| 🧠 | Señales del bróker | Humor de traders, activos populares e indicadores publicados por el bróker |
+| 🔁 | Modos de consumo | `async`/`await` o `SyncBroker` bloqueante |
+| 🧩 | Multibróker | El trait `Broker` y un registro de adaptadores separan el dominio del transporte |
+
+### Datos disponibles a través de la API
+
+Además de las operaciones, la interfaz permite leer metadatos que el bróker
+publica en su inicializador: ventana de venta anticipada, margen previo al
+cierre, proveedor del precio, decimales, rollovers de blitz, comisiones y
+operaciones de otros usuarios del instrumento.
 
 ## 📦 Instalación
+
+Desde crates.io:
+
+```toml
+[dependencies]
+cripsy-binary-api = "0.1"
+```
+
+Desde el repositorio:
 
 ```powershell
 git clone https://github.com/ionixcorp/cripsy_binary_API.git
@@ -65,64 +103,65 @@ cd cripsy_binary_API
 .\installation\install.ps1        # guiado, con aprobación en cada paso
 ```
 
-Manual:
+Compilación manual:
 
 ```powershell
-cargo build --release                                           # async
-cargo build --release --no-default-features --features blocking # sync
+cargo build --release                                            # async (por defecto)
+cargo build --release --no-default-features --features blocking  # sync
 ```
 
-Credenciales en `.env` (ignorado por git, nunca en el código):
+Las credenciales se leen del entorno. `.env` está ignorado por git:
 
 ```dotenv
 IQOPTION_EMAIL = "tu-correo@ejemplo.com"
 IQOPTION_PASSWORD = "tu-contrasena"
 ```
 
-## ✅ Compruébalo tú mismo en 30 segundos
+## ✅ Verificación
+
+Los scripts incluidos ejecutan comprobaciones reales contra el bróker. Leen
+`.env`, usan la cuenta de práctica y no requieren configuración adicional:
 
 ```powershell
-.\scripts\conectar.ps1        # sesión, balance y catálogo
-.\scripts\balance.ps1         # balance y tipo de cuenta
-.\scripts\verificar_todo.ps1  # valida TODAS las capacidades documentadas
+.\scripts\conectar.ps1        # sesión, balance, catálogo, velas y stream
+.\scripts\balance.ps1         # balance, tipo de cuenta y balance_id
+.\scripts\operar.ps1          # orden de 1 USD en demo y cierre por evento
+.\scripts\verificar_todo.ps1  # recorre todas las capacidades documentadas
 ```
 
-`verificar_todo.ps1` recorre la API de punta a punta y devuelve `[OK]`/`[FALLO]`
-por capacidad: sesión, catálogo, mercados, velas históricas, descarga paginada,
-payout, perfil, historial, suscripciones, stream, ticks y —en cuenta demo—
-órdenes clásicas, digitales, blitz y buyback. Añade `-SoloLectura` para omitir
-las órdenes.
+`verificar_todo.ps1` informa `[OK]`, `[FALLO]` o `[AVISO]` por capacidad y
+termina con código 1 si algo falla. `-SoloLectura` omite el envío de órdenes.
 
-> Última pasada registrada (cuenta demo, 8 nov 2026): **28 comprobaciones OK,
-> 0 fallos, 1 aviso** (el bróker no expone indicadores para ese activo).
+Resultado de la última ejecución (cuenta de práctica, 8 de noviembre de 2026):
+28 comprobaciones correctas, 0 fallos, 1 aviso — el bróker no publica
+indicadores para el activo consultado.
 
 ## 🧭 Uso
 
-Ejemplos ejecutables (código completo en `examples/`):
-
 ```powershell
 cargo run --example ejemplo_lectura      # async: sesión, catálogo, velas, stream
-cargo run --example ejemplo_sincrono     # sync: sin tokio ni await
-cargo run --example ejemplo_orden_demo   # orden demo y cierre por evento
+cargo run --example ejemplo_sincrono     # fachada bloqueante
+cargo run --example ejemplo_orden_demo   # orden en demo y cierre por evento
+cargo run --example verificar_todo       # verificación integral
 ```
 
-Toda la guía de usuario, con ejemplos completos y los detalles que el bróker
-exige, está en **[`docs/`](docs/)**:
+## 📚 Documentación
+
+- En línea: <https://ionixcorp.github.io/cripsy_binary_API/>
+- En el repositorio: [`docs/`](docs/) (Markdown, fuente de verdad)
 
 | Documento | Contenido |
 |---|---|
-| [Introducción](docs/01_introduccion.es.md) | Qué es, estado real de cada componente y qué no hace |
-| [Sesión y cuentas](docs/02_account/01_sesion_cuentas.es.md) | Conexión, demo/real, balances |
-| [Históricos](docs/03_candle_and_stream/01_historicos.es.md) | Límites verificados y descarga masiva |
-| [Stream y ticks](docs/03_candle_and_stream/02_stream_ticks.es.md) | Velas multi-tamaño y densidad de ticks |
+| [Introducción](docs/01_introduccion.es.md) | Alcance, estado de cada componente y qué no hace |
+| [Sesión y cuentas](docs/02_account/01_sesion_cuentas.es.md) | Conexión, cuentas y balances |
+| [Históricos](docs/03_candle_and_stream/01_historicos.es.md) | Límites por intervalo y descarga masiva |
+| [Stream y ticks](docs/03_candle_and_stream/02_stream_ticks.es.md) | Suscripciones y densidad de ticks |
 | [Fachada síncrona](docs/03_candle_and_stream/03_fachada_sincrona.es.md) | Consumo bloqueante |
-| [Digital](docs/04_digital/01_digital.es.md) · [Binary](docs/05_binary/01_binary.es.md) · [Blitz](docs/06_blitz/01_blitz.es.md) | Los tres tipos de orden |
-| [Herramientas](docs/07_herramientas/01_herramientas.es.md) | Instalación, scripts y cómo añadir un bróker |
-| [Indicadores](docs/08_indicadores/01_indicadores.es.md) | Estado real del canal de indicadores |
+| [Digital](docs/04_digital/01_digital.es.md) · [Binary](docs/05_binary/01_binary.es.md) · [Blitz](docs/06_blitz/01_blitz.es.md) | Tipos de orden |
+| [Herramientas](docs/07_herramientas/01_herramientas.es.md) | Instalación, scripts y adaptadores |
+| [Indicadores](docs/08_indicadores/01_indicadores.es.md) | Canal de indicadores del bróker |
 
-**Documentación en línea:** <https://ionixcorp.github.io/cripsy_binary_API/>
-
-**Verla en local** (un solo HTML, sin dependencias):
+Para generar la documentación navegable en local:
 
 ```powershell
 .\scripts\build_docs.ps1 -Lang es    # genera docs/site/es/index.html
@@ -130,22 +169,8 @@ exige, está en **[`docs/`](docs/)**:
 
 - **VS Code:** instala la extensión **Live Server** (Go Live) y pulsa *Go Live*
   sobre `index.html` o `docs/site/es/index.html`.
-- **Manual:** abre `docs/site/es/index.html` con doble clic — funciona también
-  sin servidor (`file://`): la navegación es por hash y no hace `fetch`.
-
-## 🔌 Consumirla desde tu proyecto
-
-```toml
-[dependencies]
-cripsy-binary-api = { path = "../cripsy_binary_API", features = ["async"] }
-```
-
-- Fija la versión (tag o commit): una actualización no debe romperte sin avisar.
-- Usa el trait `Broker` y los tipos de dominio; no hables directo con el
-  WebSocket ni construyas sobres de protocolo.
-- Interpreta los montos con la traducción del adaptador (micro-unidades,
-  `crédito total = stake + ganancia`).
-- Si necesitas una capacidad nueva o encuentras un fallo, abre un issue o un PR.
+- **Manual:** abre `docs/site/es/index.html` con doble clic. Funciona sin
+  servidor (`file://`): la navegación es por hash y no usa `fetch`.
 
 ## 🗂️ Estructura
 
@@ -153,11 +178,21 @@ cripsy-binary-api = { path = "../cripsy_binary_API", features = ["async"] }
 src/domain/      modelo puro: activos, velas, órdenes, posiciones, eventos
 src/broker/      trait Broker, configuración, adaptadores y fachada sync
 src/transport/   HTTP/WebSocket, reintentos con backoff y router request_id
-examples/        uso real + generador de documentación
+examples/        uso real y generador de documentación
 docs/            guía de usuario (Markdown, fuente de verdad)
-scripts/         compuerta de calidad, docs y validadores listos para usar
+scripts/         compuerta de calidad, documentación y verificadores
 installation/    instalación guiada y verificación de entorno
 ```
+
+## 🗺️ Hoja de ruta
+
+El trait `Broker` y el registro de adaptadores permiten incorporar nuevos
+brókers sin modificar el dominio ni el transporte. En próximas versiones se
+prevé añadir adaptadores para otros brókers, entre ellos **Deriv**, **Quotex** y
+otros; el orden y el alcance dependerán de la disponibilidad de sus interfaces
+documentadas y de las pruebas correspondientes. No hay fechas comprometidas.
+
+Las propuestas y discusiones se atienden en los issues del repositorio.
 
 ## 🧪 Calidad
 
@@ -165,16 +200,28 @@ installation/    instalación guiada y verificación de entorno
 .\scripts\verify.ps1   # fmt + clippy -D warnings + 61 tests + build blocking + docs
 ```
 
-CI en GitHub Actions (Linux y Windows) ejecuta lo mismo en cada push, más la
-generación de la documentación. Sin credenciales: los tests no tocan la red.
+El workflow de GitHub Actions repite esa compuerta en Linux y Windows. Los tests
+no acceden a la red ni requieren credenciales.
 
-## ⚖️ Garantía y descargo
+## 🛡️ Seguridad
 
-**Lo documentado funciona.** Si consumes la librería como dependencia, el trait
-`Broker` y los canales documentados en `docs/`, obtienes el comportamiento
-descrito. Queda fuera de la garantía puentear el contrato (hablar directo con el
-WebSocket), usar canales no documentados, interpretar montos sin la traducción
-del adaptador o modificar el crate en local.
+- Las credenciales se reciben por entorno; el repositorio no contiene secretos.
+- La verificación de certificados TLS está activa por defecto (`verify_tls`).
+- Los ejemplos y scripts usan cuenta de práctica; operar con cuenta real exige
+  elegir `AccountSelection::Real` de forma explícita.
+
+## ⚖️ Alcance y limitaciones
+
+La librería traduce el protocolo del bróker a tipos de dominio y expone los
+datos que el bróker entrega. No calcula indicadores técnicos, no gestiona
+riesgo ni ejecuta estrategias.
+
+El alcance de la garantía cubre el uso del trait `Broker` y de los canales
+descritos en `docs/`. Queda fuera del alcance hablar directamente con el
+WebSocket, usar canales no documentados, interpretar importes sin la traducción
+del adaptador o modificar el crate en local. Algunos datos dependen de lo que
+el bróker decida publicar en cada momento; cuando no los publica, la API
+devuelve el error del bróker sin sustituirlo por valores estimados.
 
 ```rust
 use cripsy_binary_api::{mensaje_consumidor, revisar_config};
@@ -185,26 +232,18 @@ for aviso in &revisar_config(&cfg).advertencias {
 }
 ```
 
-## 🔒 Seguridad
-
-- Credenciales solo en `.env` (git-ignored); la librería las recibe por entorno.
-- TLS con verificación de certificados activa por defecto (`verify_tls`).
-- Los ejemplos usan **cuenta demo**; operar con dinero real exige elegir
-  `AccountSelection::Real` de forma explícita.
-
 ## 🧱 Base conceptual
 
-El diseño se apoya en el conocimiento público del protocolo acumulado por la
-comunidad, en particular **la API original de IQ Option publicada en GitHub**.
-Este proyecto es una reimplementación moderna desde cero: no contiene código
-heredado de aquella, ni la usa como dependencia.
+El diseño se apoya en el conocimiento público del protocolo que la comunidad
+documentó, en particular en la API original de IQ Option publicada en GitHub.
+Este proyecto es una implementación desde cero: no incluye código de aquella ni
+la usa como dependencia.
 
 ## ⚠️ Aviso
 
-Este software no es asesoría financiera. Operar opciones binarias implica riesgo
-de pérdida total del capital y puede estar restringido por la legislación de tu
-país o por los términos del bróker. Usa cuenta demo y verifica las condiciones
-antes de operar.
+Este software no constituye asesoría financiera. Operar opciones binarias
+implica riesgo de pérdida del capital y puede estar restringido por la
+legislación de cada país o por los términos del bróker.
 
 ## 📄 Licencia
 
