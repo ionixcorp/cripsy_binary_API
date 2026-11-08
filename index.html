@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cripsy_binary_API — Portal</title>
+<style>
+:root { --bg:#0f1117; --panel:#171a23; --borde:#232838; --texto:#e6e9f0; --suave:#9aa3b5; --acento:#5aa9ff; --rojo:#ff6b6b; }
+* { box-sizing:border-box; }
+body { margin:0; font-family:"Segoe UI",system-ui,sans-serif; background:var(--bg); color:var(--texto);
+       display:flex; align-items:center; justify-content:center; min-height:100vh; padding:24px; }
+.tarjeta { background:var(--panel); border:1px solid var(--borde); border-radius:14px; padding:36px 40px;
+           max-width:760px; width:100%; }
+h1 { margin:0 0 6px; font-size:26px; }
+.sub { color:var(--suave); margin-bottom:24px; font-size:14px; }
+.estado { display:inline-block; padding:4px 12px; border-radius:999px; font-size:12.5px; margin-bottom:20px; }
+.ok { background:#12341f; color:#7ce39b; border:1px solid #1f5136; }
+.falta { background:#3a1d1d; color:#ffb3b3; border:1px solid #5c2a2a; }
+ol.pasos { padding-left:22px; }
+ol.pasos li { margin:10px 0; line-height:1.55; font-size:14.5px; }
+code { font-family:"Cascadia Code",Consolas,monospace; background:#1b2030; border-radius:4px;
+       padding:2px 6px; font-size:13px; }
+.botones { margin-top:26px; display:flex; gap:12px; flex-wrap:wrap; }
+a.btn { text-decoration:none; padding:10px 18px; border-radius:9px; font-size:14px; font-weight:600; }
+.primario { background:var(--acento); color:#08131f; }
+.secundario { background:#1e2433; color:var(--texto); border:1px solid var(--borde); }
+.nota { margin-top:22px; font-size:12.5px; color:var(--suave); line-height:1.6; }
+</style>
+</head>
+<body>
+<div class="tarjeta">
+  <h1>cripsy_binary_API</h1>
+  <div class="sub">API moderna (Rust) para brókers de opciones binarias</div>
+  <div id="estado" class="estado falta">Comprobando instalación…</div>
+
+  <div id="panel-instalar" style="display:none">
+    <p>La API todavía no está instalada en este equipo. La instalación es
+    <strong>guiada en PowerShell</strong> y nada se instala sin tu aprobación.</p>
+    <ol class="pasos">
+      <li>Abre una terminal (PowerShell 7 recomendado) en la raíz del proyecto.</li>
+      <li>Ejecuta <code>.\installation\install.ps1</code></li>
+      <li>El instalador verificará el entorno (Rust, cargo, git), te preguntará
+          antes de instalar lo que falte, creará tu <code>.env</code>, compilará
+          la librería en sus dos variantes, generará esta documentación y
+          ejecutará una prueba de conexión de solo lectura si la apruebas.</li>
+      <li>Al terminar, recarga esta página: la documentación se abrirá
+          automáticamente.</li>
+    </ol>
+    <div class="botones">
+      <a class="btn primario" href="installation/README.md">Ver guía de instalación</a>
+      <a class="btn secundario" href="README.md">Guía de uso y reglas</a>
+    </div>
+    <div class="nota">Un navegador no puede instalar software: la instalación la
+    realiza el script real de PowerShell, con aprobación en cada paso. Esta
+    página solo detecta el resultado. Si tu equipo quiere consumir la API desde
+    otro proyecto, empieza por el <code>README.md</code>.</div>
+  </div>
+
+  <div id="panel-docs" style="display:none">
+    <p>La API está instalada. La documentación navegable ya está disponible.</p>
+    <div class="botones">
+      <a class="btn primario" href="docs/site/es/index.html">Abrir documentación (Español)</a>
+      <a class="btn secundario" href="docs/site/en/index.html">English (próximamente)</a>
+    </div>
+    <div class="nota">Para regenerar la documentación tras editar los
+    Markdown: <code>.\scripts\build_docs.ps1 -Lang es</code></div>
+  </div>
+</div>
+
+<!-- El instalador escribe este archivo: file:// bloquea fetch() de JSON, por eso
+     el estado viaja como JavaScript, que sí se carga con <script src>. -->
+<script src="docs/site/installed.js"></script>
+<script>
+(function () {
+  var estado = document.getElementById("estado");
+  var panelInstalar = document.getElementById("panel-instalar");
+  var panelDocs = document.getElementById("panel-docs");
+  var instalado = (typeof INSTALL_STATE !== "undefined") && INSTALL_STATE && INSTALL_STATE.installed === true;
+  if (instalado) {
+    estado.textContent = "Instalada" + (INSTALL_STATE.at ? " — " + INSTALL_STATE.at : "");
+    estado.className = "estado ok";
+    panelDocs.style.display = "block";
+  } else {
+    estado.textContent = "No instalada";
+    estado.className = "estado falta";
+    panelInstalar.style.display = "block";
+  }
+})();
+</script>
+</body>
+</html>

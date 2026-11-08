@@ -1,0 +1,18 @@
+# Rust
+/target
+
+# Secretos: NUNCA al repositorio
+.env
+.env.*
+!.env.example
+
+# Documentación navegable generada (scriptsuild_docs.ps1)
+/docs/site
+
+# Volcados de datos y capturas locales
+*.ndjson
+/data
+
+# Editores
+.idea
+.vscode

@@ -1,0 +1,62 @@
+[package]
+name = "cripsy-binary-api"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.86"
+description = "API moderna multibroker para opciones binarias (Rust, sync y async)"
+license = "MIT"
+repository = "https://github.com/ionixcorp/cripsy_binary_API"
+homepage = "https://github.com/ionixcorp/cripsy_binary_API"
+readme = "README.md"
+keywords = ["trading", "binary-options", "broker", "async", "api"]
+categories = ["api-bindings", "asynchronous"]
+
+[lib]
+name = "cripsy_binary_api"
+path = "src/lib.rs"
+
+[features]
+default = ["async"]
+# Núcleo async: tokio + WebSocket async + HTTP async.
+async = [
+    "dep:tokio",
+    "dep:tokio-tungstenite",
+    "dep:reqwest",
+    "dep:uuid",
+    "dep:async-trait",
+    "tokio/full",
+    "tokio-tungstenite/stream",
+    "tokio-tungstenite/rustls-tls-webpki-roots",
+    "dep:futures-util",
+    "reqwest/json",
+    "reqwest/rustls-tls",
+]
+# Fachada sincrona: misma lógica, transporte bloqueante.
+blocking = [
+    "dep:tungstenite",
+    "dep:reqwest",
+    "dep:async-trait",
+    "dep:tokio",
+    "reqwest/blocking",
+    "reqwest/rustls-tls",
+    "tungstenite/native-tls",
+]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tracing = "0.1"
+futures-core = "0.3"
+futures-util = { version = "0.3", optional = true, features = ["sink", "io"] }
+async-trait = { version = "0.1", optional = true }
+
+tokio = { version = "1", optional = true, features = ["sync", "time"] }
+tokio-tungstenite = { version = "0.24", optional = true }
+tungstenite = { version = "0.24", optional = true }
+reqwest = { version = "0.12", optional = true, default-features = false }
+uuid = { version = "1", optional = true, features = ["v4"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt"] }
+futures-util = { version = "0.3", features = ["sink"] }
