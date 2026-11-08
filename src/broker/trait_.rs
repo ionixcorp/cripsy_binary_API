@@ -4,9 +4,9 @@ use async_trait::async_trait;
 use futures_core::Stream;
 
 use crate::domain::{
-    AccountType, Asset, AssetProfile, Balance, BuyBinaryRequest, BuyDigitalRequest, Candle,
-    CandleRequest, CandleSubscribe, Event, MarketStatus, OperationResult, OptionType, OrderId,
-    Payout, PositionHistory, TechnicalIndicators,
+    AccountType, Asset, AssetProfile, Balance, BuyBinaryRequest, BuyBlitzRequest,
+    BuyDigitalRequest, Candle, CandleRequest, CandleSubscribe, Event, MarketStatus,
+    OperationResult, OptionType, OrderId, Payout, PositionHistory, TechnicalIndicators,
 };
 
 use super::config::BrokerParams;
@@ -66,6 +66,11 @@ pub trait Broker: Send + Sync {
 
     // -------- Payout --------
 
+    /// Payout **publicado en el catálogo** para el activo.
+    ///
+    /// `expiration_seconds` se devuelve en el resultado pero no altera la
+    /// consulta: no se pide una cotización por expiración ni por strike. Los
+    /// cambios en vivo llegan por `Event::PayoutChanged`.
     async fn get_payout(
         &self,
         symbol: &str,
@@ -96,7 +101,13 @@ pub trait Broker: Send + Sync {
 
     // -------- Órdenes --------
 
+    /// Compra clásica (turbo o binary según la duración).
+    ///
+    /// BLITZ tiene su propia petición: [`Broker::buy_blitz`].
     async fn buy_binary(&self, req: BuyBinaryRequest) -> Result<OrderId, BrokerError>;
+
+    /// Compra BLITZ: duración en segundos y payout explícito (protocolo v2).
+    async fn buy_blitz(&self, req: BuyBlitzRequest) -> Result<OrderId, BrokerError>;
 
     /// Compra digital spot: el bróker elige el strike a precio actual.
     async fn buy_digital_spot(&self, req: BuyDigitalRequest) -> Result<OrderId, BrokerError>;
@@ -106,7 +117,10 @@ pub trait Broker: Send + Sync {
     /// es vendible responde con su mensaje de rechazo.
     async fn sell_option(&self, order_id: &OrderId) -> Result<(), BrokerError>;
 
-    /// Respaldo de consulta puntual (el resultado normal llega por `events()`).
+    /// Resultado leído de la caché local (alimentada por `events()`).
+    ///
+    /// No consulta al bróker: devuelve `OperationResult::Pending` mientras el
+    /// cierre no haya llegado por eventos.
     async fn get_operation_result(
         &self,
         order_id: &OrderId,

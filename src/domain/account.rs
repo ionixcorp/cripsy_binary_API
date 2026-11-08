@@ -7,6 +7,10 @@ pub enum AccountType {
     Practice,
     Real,
     Tournament,
+    /// Tipo de balance que el adaptador no reconoce.
+    ///
+    /// Existe para no interpretar una categoría desconocida como cuenta real.
+    Unknown,
 }
 
 /// Balance de una cuenta concreta del bróker.

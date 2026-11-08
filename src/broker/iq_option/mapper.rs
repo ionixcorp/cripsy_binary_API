@@ -22,7 +22,12 @@ pub fn tipo_de_cuenta(balance_type: i64) -> AccountType {
     match balance_type {
         1 => AccountType::Real,
         4 => AccountType::Practice,
-        _ => AccountType::Real,
+        // Un tipo desconocido NO se interpreta como cuenta real: se marca como
+        // desconocido y se registra para poder diagnosticarlo.
+        otro => {
+            tracing::warn!(balance_type = otro, "tipo de cuenta no reconocido");
+            AccountType::Unknown
+        }
     }
 }
 
@@ -860,6 +865,9 @@ mod tests {
     fn tipo_de_cuenta_desde_type() {
         assert_eq!(tipo_de_cuenta(4), AccountType::Practice);
         assert_eq!(tipo_de_cuenta(1), AccountType::Real);
+        // Un tipo no documentado nunca se degrada a `Real`.
+        assert_eq!(tipo_de_cuenta(7), AccountType::Unknown);
+        assert_eq!(tipo_de_cuenta(0), AccountType::Unknown);
     }
 
     #[test]

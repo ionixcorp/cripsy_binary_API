@@ -12,8 +12,8 @@ la sesión, el catálogo de activos, las velas históricas, el stream de velas y
 ticks, y el envío de órdenes clásicas, digitales y blitz. El mismo motor se
 ofrece como núcleo `async` y como fachada bloqueante.
 
-Los resultados de las operaciones se entregan como eventos; existe una consulta
-puntual como respaldo.
+Los resultados de las operaciones se entregan como eventos. El último resultado
+se lee de una caché local alimentada por esos eventos, sin consultar al bróker.
 
 ```rust
 let broker = IqOptionBroker::nuevo(BrokerParams::IqOption(cfg)).await?;
@@ -217,6 +217,20 @@ del adaptador o modificar el crate en local. Algunos datos dependen de lo que
 el bróker decida publicar en cada momento; cuando no los publica, la API
 devuelve el error del bróker sin sustituirlo por valores estimados.
 
+Limitaciones conocidas de la versión actual:
+
+- **Sin reconexión automática.** El handshake inicial reintenta con backoff,
+  pero si el WebSocket cae la sesión queda desconectada: las peticiones en
+  vuelo terminan con error y hay que reconectar y resuscribir.
+- **`get_operation_result` no consulta al bróker.** Lee la caché de eventos;
+  sin el stream activo una orden puede permanecer en `Pending`.
+- **`get_payout` devuelve el payout del catálogo.** El parámetro de expiración
+  no cambia la consulta; los cambios en vivo llegan por `Event::PayoutChanged`.
+- **Sin baja explícita de suscripciones.** Al soltar el `CandleStream`, la
+  suscripción se retira en el siguiente despacho de velas.
+- **Pérdida de eventos.** Si el consumidor se atrasa más que el buffer (1024),
+  recibe `Event::EventsLost { count }` y el stream continúa.
+
 ```rust
 use cripsy_binary_api::{mensaje_consumidor, revisar_config};
 
@@ -232,6 +246,10 @@ El diseño se apoya en el conocimiento público del protocolo que la comunidad
 documentó, en particular en la API original de IQ Option publicada en GitHub.
 Este proyecto es una implementación desde cero: no incluye código de aquella ni
 la usa como dependencia.
+
+Proyecto independiente: no está afiliado, patrocinado ni respaldado por
+IQ Option. La licencia MIT cubre el código de este repositorio, no las marcas ni
+los protocolos de terceros.
 
 ## ❤️ Apoyar el proyecto
 

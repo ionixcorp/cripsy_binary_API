@@ -83,10 +83,12 @@ impl IqOptionBroker {
         })?;
 
         // ---------- WSS ----------
-        let ws = WsClient::connect(
+        // Reintentos con backoff en el handshake. La reconexión posterior a
+        // una caída no es automática: ver «Limitaciones conocidas» en docs/.
+        let ws = WsClient::connect_con_reintentos(
             &endpoints::ws_url(&config.ws_host),
-            &[("Cookie", &format!("ssid={ssid}"))],
-            &cfg_trafico,
+            vec![("Cookie".to_string(), format!("ssid={ssid}"))],
+            cfg_trafico.clone(),
         )
         .await?;
 
@@ -188,14 +190,19 @@ impl IqOptionBroker {
             .send(Saliente {
                 name: name.into(),
                 msg: msg.clone(),
-                request_id: rid,
+                request_id: rid.clone(),
             })
             .map_err(|_| BrokerError::Internal("canal de salida cerrado".into()))?;
         let plazo = std::time::Duration::from_secs(self.config.timeout_secs);
         match tokio::time::timeout(plazo, rx).await {
             Ok(Ok(msg)) => Ok(msg),
             Ok(Err(_)) => Err(BrokerError::Internal("respuesta descartada".into())),
-            Err(_) => Err(BrokerError::Timeout),
+            Err(_) => {
+                // Sin respuesta no hay quién recoja el id: si no se retira, la
+                // entrada queda en la tabla hasta que llegue un mensaje tardío.
+                self.router.discard(&rid);
+                Err(BrokerError::Timeout)
+            }
         }
     }
 
@@ -205,7 +212,9 @@ impl IqOptionBroker {
         name: &str,
         msg: &Value,
     ) -> Result<(), BrokerError> {
-        let (rid, _rx) = self.router.register("iq");
+        // Sin receptor: registrar uno que se descarta al instante dejaría una
+        // entrada pendiente por cada suscripción.
+        let rid = self.router.next_id("iq");
         self.salida
             .as_ref()
             .ok_or_else(|| BrokerError::Internal("canal de salida cerrado".into()))?
@@ -277,7 +286,7 @@ async fn tarea_socket(
     mut rx_salida: mpsc::UnboundedReceiver<Saliente>,
     ctx: Ctx,
 ) {
-    loop {
+    let motivo = loop {
         tokio::select! {
             frame = ws.siguiente() => {
                 match frame {
@@ -291,12 +300,10 @@ async fn tarea_socket(
                     }
                     Some(Err(e)) => {
                         tracing::warn!(error = %e, "error de lectura del websocket");
-                        ctx.estado.write().await.conectado = false;
-                        break;
+                        break "error de lectura";
                     }
                     None => {
-                        ctx.estado.write().await.conectado = false;
-                        break;
+                        break "el bróker cerró el socket";
                     }
                 }
             }
@@ -305,18 +312,24 @@ async fn tarea_socket(
                     Some(s) => {
                         if let Err(e) = ws.enviar(&s.name, &s.msg, &s.request_id).await {
                             tracing::warn!(error = %e, "error de escritura del websocket");
-                            ctx.estado.write().await.conectado = false;
-                            break;
+                            break "error de escritura";
                         }
                     }
                     None => {
                         let _ = ws.cerrar().await;
-                        break;
+                        break "cierre solicitado";
                     }
                 }
             }
         }
-    }
+    };
+
+    // Cierre ordenado: sin esto, las peticiones en vuelo esperarían hasta su
+    // timeout y las suscripciones quedarían como receptores sin emisor.
+    ctx.router.fail_all();
+    ctx.sub_velas.write().await.clear();
+    ctx.estado.write().await.conectado = false;
+    tracing::warn!(motivo, "sesión sin conexión; no hay reconexión automática");
 }
 
 /// Enruta un frame al estado, a las suscripciones o al bus de eventos.
@@ -383,7 +396,10 @@ async fn enrutar_evento(frame: &crate::transport::websocket::WsFrame, ctx: &Ctx)
                     });
                 }
                 if let Some((_, candle)) = mapper::vela_viva_unica(&frame.msg) {
-                    let subs = sub_velas.read().await;
+                    // Poda: las suscripciones cuyo stream soltó el consumidor se
+                    // retiran aquí (no hay API de baja explícita).
+                    let mut subs = sub_velas.write().await;
+                    subs.retain(|s| !s.tx.is_closed());
                     for sub in subs.iter() {
                         if sub.symbol == symbol
                             && (sub.interval == 0 || sub.interval as i64 == candle.to - candle.from)
@@ -414,7 +430,8 @@ async fn enrutar_evento(frame: &crate::transport::websocket::WsFrame, ctx: &Ctx)
                             tick,
                         });
                     }
-                    let subs = sub_velas.read().await;
+                    let mut subs = sub_velas.write().await;
+                    subs.retain(|s| !s.tx.is_closed());
                     for (size, candle) in mapper::velas_vivas_multi(&frame.msg) {
                         for sub in subs.iter() {
                             if sub.symbol == symbol && (sub.interval == 0 || sub.interval == size) {

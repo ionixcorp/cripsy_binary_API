@@ -56,4 +56,11 @@ pub enum Event {
     LiveDeal(LiveDeal),
     /// Comisión de un activo actualizada por el bróker.
     CommissionChanged(CommissionChange),
+    /// Pérdida de continuidad: el canal descartó `count` eventos.
+    ///
+    /// El stream continúa entregando los eventos posteriores. Se emite para
+    /// distinguir «me quedé atrás» de «la sesión terminó».
+    EventsLost {
+        count: u64,
+    },
 }

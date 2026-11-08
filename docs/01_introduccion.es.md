@@ -6,13 +6,13 @@ opciones binarias. Diseñada desde cero, con estas propiedades:
 - **Núcleo asíncrono**: el adaptador es `async`/`await` nativo.
 - **Fachada sincrónica**: `broker::sync::SyncBroker` permite consumir la misma
   API con llamadas bloqueantes, sin tokio ni `await`.
-- **Sin estado global y sin polling**: cada petición crea un canal y la
+- **Sin estado global estático y sin polling**: cada petición crea un canal y la
   respuesta se correlaciona por `request_id`; los resultados de las órdenes
   llegan por eventos.
 - **Multibróker**: una interfaz común (`Broker`) con adaptadores por bróker;
   el primero es IQ Option.
 - **Streams nativos de alta densidad**: ~3 ticks de precio por segundo por
-  activo, sin límite de caudal por conexión.
+  activo en la medición documentada; hasta 75 activos por sesión sin rechazos.
 - **Tipado de extremo a extremo**: nada de diccionarios crudos en la frontera
   pública.
 
@@ -63,3 +63,22 @@ Todas las llamadas del trait `Broker` son `async` y devuelven
 - Rust 1.86 o superior (`rustup`).
 - Credenciales del bróker (se recomienda cuenta demo para empezar).
 - Windows, Linux o macOS.
+
+## Limitaciones conocidas
+
+- **Sin reconexión automática**: si el WebSocket cae, la sesión queda
+  desconectada (`is_connected()` devuelve `false`), las peticiones en vuelo
+  terminan con error y el consumidor debe reconectar y volver a suscribirse.
+  El handshake inicial sí reintenta con backoff.
+- **Resultado de operación desde caché**: `get_operation_result` lee la caché
+  alimentada por eventos; no consulta al bróker. Sin el stream activo, una orden
+  puede quedarse en `Pending`.
+- **Payout del catálogo**: `get_payout` devuelve el payout publicado para el
+  activo; el parámetro de expiración no cambia la consulta. Los cambios en vivo
+  llegan por `Event::PayoutChanged`.
+- **Suscripciones sin baja explícita**: al soltar el `CandleStream` la
+  suscripción se retira en el siguiente despacho de velas.
+- **Pérdida de eventos**: si el consumidor se atrasa más que el buffer (1024),
+  el stream entrega `Event::EventsLost { count }` y continúa.
+- **Indicadores técnicos**: dependen de lo que el bróker publique para cada
+  activo; hoy los rechaza para los activos probados.

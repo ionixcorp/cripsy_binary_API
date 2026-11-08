@@ -38,12 +38,42 @@ impl RequestRouter {
     /// antes de la respuesta, el mensaje se ignora en [`Self::deliver`].
     pub fn register(&self, prefijo: &str) -> (String, oneshot::Receiver<Value>) {
         let (tx, rx) = oneshot::channel();
-        let mut contador = self.contador.lock().expect("router no envenenado");
-        *contador += 1;
-        let id = format!("{prefijo}-{}-{}", uuid_v4_simple(), *contador);
+        let id = self.next_id(prefijo);
         let mut pending = self.pending.lock().expect("router no envenenado");
         pending.insert(id.clone(), tx);
         (id, rx)
+    }
+
+    /// Genera un `request_id` único sin registrar receptor.
+    ///
+    /// Para mensajes que no esperan respuesta correlacionada (suscripciones):
+    /// registrar un receptor que se descarta al instante dejaría una entrada
+    /// que solo se libera si el bróker llega a responder.
+    pub fn next_id(&self, prefijo: &str) -> String {
+        let mut contador = self.contador.lock().expect("router no envenenado");
+        *contador += 1;
+        format!("{prefijo}-{}-{}", uuid_v4_simple(), *contador)
+    }
+
+    /// Retira una solicitud pendiente sin respuesta (por ejemplo, tras un
+    /// timeout). Devuelve `true` si había una entrada registrada.
+    pub fn discard(&self, request_id: &str) -> bool {
+        self.pending
+            .lock()
+            .expect("router no envenenado")
+            .remove(request_id)
+            .is_some()
+    }
+
+    /// Descarta todas las solicitudes pendientes cuando el socket se cierra.
+    ///
+    /// Los receptores despiertan con error, de modo que ninguna espera queda
+    /// colgada hasta agotar su timeout. Devuelve cuántas se descartaron.
+    pub fn fail_all(&self) -> usize {
+        let mut pending = self.pending.lock().expect("router no envenenado");
+        let total = pending.len();
+        pending.clear();
+        total
     }
 
     /// Entrega `msg` al receptor pendiente con ese `request_id`.
@@ -121,5 +151,33 @@ mod tests {
         let (b, _rx_b) = r.register("x");
         assert_ne!(a, b);
         assert_eq!(r.pending_count(), 2);
+    }
+
+    #[test]
+    fn discard_libera_la_entrada() {
+        let r = RequestRouter::new();
+        let (id, _rx) = r.register("t");
+        assert!(r.discard(&id));
+        assert_eq!(r.pending_count(), 0);
+        assert!(!r.discard(&id), "descartar dos veces no debe mentir");
+    }
+
+    #[test]
+    fn next_id_no_registra_entrada() {
+        let r = RequestRouter::new();
+        let id = r.next_id("sub");
+        assert!(id.starts_with("sub-"));
+        assert_eq!(r.pending_count(), 0);
+    }
+
+    #[tokio::test]
+    async fn fail_all_despierta_a_los_esperadores() {
+        let r = RequestRouter::new();
+        let (_a, rx_a) = r.register("x");
+        let (_b, rx_b) = r.register("x");
+        assert_eq!(r.fail_all(), 2);
+        assert_eq!(r.pending_count(), 0);
+        assert!(rx_a.await.is_err(), "el esperador debe despertar con error");
+        assert!(rx_b.await.is_err(), "el esperador debe despertar con error");
     }
 }

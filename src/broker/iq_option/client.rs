@@ -70,13 +70,12 @@ impl Broker for IqOptionBroker {
     }
 
     async fn get_account_type(&self) -> Result<AccountType, BrokerError> {
-        Ok(self
-            .estado_lectura()
+        self.estado_lectura()
             .await
             .session
             .as_ref()
             .map(|s| s.account_type)
-            .unwrap_or(AccountType::Practice))
+            .ok_or_else(|| BrokerError::Internal("sesión no inicializada".into()))
     }
 
     async fn switch_account(&mut self, kind: AccountType) -> Result<(), BrokerError> {
@@ -95,19 +94,28 @@ impl Broker for IqOptionBroker {
             &json!({ "balance_id": balance_id }),
         )
         .await?;
-        let respuesta = self
+
+        // Si el refresco falla, el cambio NO se da por hecho: el error se
+        // propaga y la sesión conserva la cuenta anterior.
+        let lista = self
             .solicitar(msg::GET_BALANCES, &json!({}), "balances")
-            .await;
-        if let Ok(lista) = respuesta {
-            let balances = mapper::balances_desde_lista(&lista);
-            if !balances.is_empty() {
-                let mut estado = self.estado.write().await;
-                estado.balances = balances;
-                if let Some(s) = estado.session.as_mut() {
-                    s.balance_id = Some(balance_id);
-                    s.account_type = kind;
-                }
-            }
+            .await?;
+        let balances = mapper::balances_desde_lista(&lista);
+        if balances.is_empty() {
+            return Err(BrokerError::Rejected(
+                "el bróker no devolvió balances tras el cambio de cuenta".into(),
+            ));
+        }
+        if !balances.iter().any(|b| b.id == balance_id) {
+            return Err(BrokerError::Rejected(format!(
+                "el bróker no confirmó el balance {balance_id}"
+            )));
+        }
+        let mut estado = self.estado.write().await;
+        estado.balances = balances;
+        if let Some(s) = estado.session.as_mut() {
+            s.balance_id = Some(balance_id);
+            s.account_type = kind;
         }
         Ok(())
     }
@@ -200,6 +208,10 @@ impl Broker for IqOptionBroker {
         )
         .await?;
 
+        // Canal por suscripción. Al soltar el `CandleStream` el receptor queda
+        // cerrado y la suscripción se retira en el siguiente despacho de velas
+        // (`sub_velas.retain`): no hay API de baja explícita. El canal es
+        // ilimitado, así que el consumidor debe drenarlo.
         let (tx, rx) = mpsc::unbounded_channel::<Candle>();
         self.sub_velas
             .write()
@@ -433,16 +445,31 @@ impl Broker for IqOptionBroker {
         Ok(())
     }
     async fn buy_binary(&self, req: BuyBinaryRequest) -> Result<OrderId, BrokerError> {
-        // Cada grupo del catálogo (binary/turbo/blitz) tiene SUS PROPIOS
-        // metadatos: el blitz debe resolverse contra el grupo blitz
-        // (expiraciones en segundos distintas a las de binary/turbo).
-        let catalogo = self.catalogo.read().await;
-        let asset = if req.option_type == OptionType::Blitz {
-            catalogo
-                .iter()
-                .find(|a| a.symbol == req.symbol && a.class == AssetClass::Blitz)
-                .cloned()
-        } else {
+        // BLITZ tiene su propia petición (duración en segundos y payout): se
+        // delega en `buy_blitz` para no transportar segundos en
+        // `expiration_minutes`.
+        if req.option_type == OptionType::Blitz {
+            let payout = {
+                let catalogo = self.catalogo.read().await;
+                catalogo
+                    .iter()
+                    .find(|a| a.symbol == req.symbol && a.class == AssetClass::Blitz)
+                    .and_then(|a| a.payout_percent)
+                    .unwrap_or(0.0)
+            };
+            return self
+                .buy_blitz(BuyBlitzRequest {
+                    symbol: req.symbol,
+                    amount: req.amount,
+                    direction: req.direction,
+                    expiration_size_secs: req.expiration_minutes,
+                    profit_percent: payout,
+                })
+                .await;
+        }
+
+        let asset = {
+            let catalogo = self.catalogo.read().await;
             catalogo
                 .iter()
                 .find(|a| {
@@ -456,7 +483,6 @@ impl Broker for IqOptionBroker {
                 req.symbol.clone(),
             ))
         })?;
-        drop(catalogo);
 
         if asset.status == MarketStatus::Closed {
             return Err(BrokerError::Domain(
@@ -481,66 +507,17 @@ impl Broker for IqOptionBroker {
             "direction": match req.direction { Direction::Call => "call", Direction::Put => "put" }
         });
 
-        let option_type_id = match req.option_type {
-            OptionType::Blitz => {
-                let extras = asset
-                    .extras
-                    .as_ref()
-                    .ok_or_else(|| BrokerError::Rejected("activo sin metadata de blitz".into()))?;
-                // Para blitz, `expiration_minutes` transporta el tamaño en SEGUNDOS
-                // (las duraciones del catálogo blitz están en segundos).
-                let secs = req.expiration_minutes;
-                // Duraciones admitidas: `option.expiration_times` ∪ `rollovers[].expiration_size`.
-                let mut permitidos = extras
-                    .expiration_times_secs
-                    .as_ref()
-                    .cloned()
-                    .unwrap_or_default();
-                for r in extras.rollovers.as_ref().into_iter().flatten() {
-                    let s = r.expiration_size as u64;
-                    if !permitidos.contains(&s) {
-                        permitidos.push(s);
-                    }
-                }
-                permitidos.sort_unstable();
-                if !permitidos.is_empty() && !permitidos.contains(&secs) {
-                    return Err(BrokerError::Rejected(format!(
-                        "duración {secs}s no admitida; admite {permitidos:?}"
-                    )));
-                }
-                // `expired` debe ir alineado al multiplo de la duracion
-                // (el broker rechaza valores desalineados)
-                let expired =
-                    mapper::expiracion_blitz_alineada(self.hora_servidor_segs().await, secs);
-                body["expired"] = json!(expired);
-                body["expiration_size"] = json!(secs);
-                // El bróker exige entero (rechaza "86.0").
-                let profit_percent = asset.payout_percent.unwrap_or(0.0).round() as i64;
-                body["profit_percent"] = json!(profit_percent);
-                option_type_id::BLITZ
-            }
-            OptionType::Binary | OptionType::Digital => {
-                // Clásica v1.0: expiración por tabla de minutos/cuartos de hora.
-                let (expired, idx) = mapper::tiempo_de_expiracion(
-                    self.hora_servidor_segs().await,
-                    req.expiration_minutes,
-                );
-                body["expired"] = json!(expired);
-                if idx < 5 {
-                    option_type_id::TURBO
-                } else {
-                    option_type_id::BINARY
-                }
-            }
-        };
-        body["option_type_id"] = json!(option_type_id);
-
-        // Blitz usa v2.0 (respuesta `option`); clásica usa v1.0 (`buyComplete`).
-        let (version, esperada) = if req.option_type == OptionType::Blitz {
-            ("2.0", msg::OPTION)
+        // Clásica v1.0: expiración por tabla de minutos/cuartos de hora.
+        let (expired, idx) =
+            mapper::tiempo_de_expiracion(self.hora_servidor_segs().await, req.expiration_minutes);
+        body["expired"] = json!(expired);
+        body["option_type_id"] = json!(if idx < 5 {
+            option_type_id::TURBO
         } else {
-            ("1.0", msg::BUY_COMPLETE)
-        };
+            option_type_id::BINARY
+        });
+
+        let (version, esperada) = ("1.0", msg::BUY_COMPLETE);
         match self
             .solicitar(
                 msg::SEND_MESSAGE,
@@ -567,6 +544,99 @@ impl Broker for IqOptionBroker {
             }
             Err(e) => Err(e),
         }
+    }
+
+    async fn buy_blitz(&self, req: BuyBlitzRequest) -> Result<OrderId, BrokerError> {
+        // El blitz se resuelve contra el grupo blitz del catálogo, cuyos
+        // metadatos (duraciones en segundos, rollovers) son propios.
+        let asset = {
+            let catalogo = self.catalogo.read().await;
+            catalogo
+                .iter()
+                .find(|a| a.symbol == req.symbol && a.class == AssetClass::Blitz)
+                .cloned()
+        }
+        .ok_or_else(|| {
+            BrokerError::Domain(crate::domain::error::DomainError::AssetNotFound(
+                req.symbol.clone(),
+            ))
+        })?;
+
+        if asset.status == MarketStatus::Closed {
+            return Err(BrokerError::Domain(
+                crate::domain::error::DomainError::MarketClosed(req.symbol),
+            ));
+        }
+        let extras = asset
+            .extras
+            .as_ref()
+            .ok_or_else(|| BrokerError::Rejected("activo sin metadata de blitz".into()))?;
+        if let Some(min) = extras.min_amount {
+            if req.amount < min {
+                return Err(BrokerError::Domain(
+                    crate::domain::error::DomainError::InvalidAmount(format!("mínimo {min}")),
+                ));
+            }
+        }
+
+        // Duraciones admitidas: `option.expiration_times` ∪ `rollovers[].expiration_size`.
+        let mut permitidos = extras.expiration_times_secs.clone().unwrap_or_default();
+        for r in extras.rollovers.as_ref().into_iter().flatten() {
+            let s = r.expiration_size as u64;
+            if !permitidos.contains(&s) {
+                permitidos.push(s);
+            }
+        }
+        permitidos.sort_unstable();
+        let secs = req.expiration_size_secs;
+        if !permitidos.is_empty() && !permitidos.contains(&secs) {
+            return Err(BrokerError::Rejected(format!(
+                "duración {secs}s no admitida; admite {permitidos:?}"
+            )));
+        }
+
+        // Payout: el de la petición si viene informado; si no, el del catálogo.
+        let payout = if req.profit_percent > 0.0 {
+            req.profit_percent
+        } else {
+            asset.payout_percent.unwrap_or(0.0)
+        };
+
+        let body = json!({
+            "active_id": asset.opcode,
+            "user_balance_id": self.estado_lectura().await.session.as_ref()
+                .and_then(|s| s.balance_id),
+            "price": req.amount,
+            "direction": match req.direction { Direction::Call => "call", Direction::Put => "put" },
+            // `expired` debe quedar alineado al múltiplo de la duración.
+            "expired": mapper::expiracion_blitz_alineada(self.hora_servidor_segs().await, secs),
+            "expiration_size": secs,
+            // El bróker exige entero (rechaza "86.0").
+            "profit_percent": payout.round() as i64,
+            "option_type_id": option_type_id::BLITZ,
+        });
+
+        let respuesta = self
+            .solicitar(
+                msg::SEND_MESSAGE,
+                &json!({ "name": msg::OPEN_OPTION, "version": "2.0", "body": body }),
+                msg::OPTION,
+            )
+            .await?;
+        let id = respuesta
+            .get("id")
+            .and_then(|i| i.as_i64())
+            .or_else(|| respuesta.pointer("/result/id").and_then(|i| i.as_i64()))
+            .ok_or_else(|| {
+                BrokerError::Rejected(
+                    respuesta
+                        .get("message")
+                        .and_then(|m| m.as_str())
+                        .unwrap_or("respuesta sin id de orden blitz")
+                        .to_string(),
+                )
+            })?;
+        Ok(id.to_string())
     }
 
     async fn buy_digital_spot(&self, req: BuyDigitalRequest) -> Result<OrderId, BrokerError> {
@@ -680,11 +750,15 @@ impl Broker for IqOptionBroker {
         }
     }
 
+    /// Lee el resultado de la caché local, alimentada por los eventos de
+    /// cierre (`option-closed`, `socket-option-closed`, `position-changed`).
+    ///
+    /// **No hace ninguna petición al bróker**: si el cierre aún no ha llegado
+    /// por eventos, devuelve `OperationResult::Pending`.
     async fn get_operation_result(
         &self,
         order_id: &OrderId,
     ) -> Result<OperationResult, BrokerError> {
-        // Cache alimentada por eventos de cierre: sin polling.
         let cache = self.resultados.read().await;
         Ok(cache
             .get(order_id)
@@ -699,7 +773,12 @@ impl Broker for IqOptionBroker {
         let stream = unfold(rx, |mut rx| async move {
             match rx.recv().await {
                 Ok(ev) => Some((ev, rx)),
-                Err(_) => None,
+                // Pérdida de continuidad: se informa y el stream continúa, en
+                // vez de cerrarse como si la sesión hubiera terminado.
+                Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                    Some((Event::EventsLost { count: n }, rx))
+                }
+                Err(tokio::sync::broadcast::error::RecvError::Closed) => None,
             }
         });
         Ok(Box::pin(stream))

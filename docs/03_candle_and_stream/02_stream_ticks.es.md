@@ -35,8 +35,9 @@ while let Some(ev) = eventos.next().await {
 ```
 
 El bus de eventos tiene buffer acotado (1024 eventos). Si tu consumidor se
-atrasa más que el buffer, el stream se cierra y hay que volver a llamar
-`events()`: consume los eventos sin bloqueos largos entre lectura y lectura.
+atrasa más que el buffer, se descartan los eventos intermedios y el stream
+entrega `Event::EventsLost { count }` con la cuenta de los perdidos; el stream
+sigue abierto. Consume sin bloqueos largos entre lectura y lectura.
 
 Medido en vivo (2026-10-27, varios mercados OTC):
 
@@ -50,10 +51,11 @@ Hallazgos clave:
 
 - La densidad (~3/s por activo) **no depende** de suscribir multi-tamaño o un
   tamaño específico: da igual.
-- **Sin límite de caudal por conexión**: con 20 activos suscritos se midieron
-  61 mensajes/s (3.07 por activo); el caudal escala linealmente.
+- **Caudal proporcional al número de activos**: con 20 activos suscritos se
+  midieron 61 mensajes/s (3.07 por activo).
 - Escala verificada hasta **75 activos en una sola sesión**: 0 rechazos,
-  5338 velas en 25 s (2.85 velas/s por activo).
+  5338 velas en 25 s (2.85 velas/s por activo). No se probó por encima de esa
+  cifra, así que no se documenta un techo.
 - La densidad exacta depende de la liquidez y el horario del activo; los
   ejemplos miden mercados OTC de fin de semana.
 

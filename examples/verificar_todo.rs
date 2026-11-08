@@ -20,8 +20,8 @@ use cripsy_binary_api::broker::historico::{descargar, ultimo_cierre};
 use cripsy_binary_api::broker::iq_option::session::IqOptionBroker;
 use cripsy_binary_api::broker::trait_::Broker;
 use cripsy_binary_api::domain::{
-    BuyBinaryRequest, BuyDigitalRequest, CandleRequest, CandleSubscribe, Direction, Event,
-    MarketStatus, OperationResult, OptionType,
+    BuyBinaryRequest, BuyBlitzRequest, BuyDigitalRequest, CandleRequest, CandleSubscribe,
+    Direction, Event, MarketStatus, OperationResult, OptionType,
 };
 use futures_util::StreamExt;
 
@@ -413,13 +413,18 @@ async fn verificar_ordenes(broker: &mut IqOptionBroker, simbolo: &str, v: &mut V
     }
 
     // 3) Blitz (30 segundos): el bróker puede no admitirlo según el activo.
+    let payout_blitz = broker
+        .get_payout(simbolo, 30)
+        .await
+        .map(|p| p.profit_percent)
+        .unwrap_or(0.0);
     let blitz = broker
-        .buy_binary(BuyBinaryRequest {
+        .buy_blitz(BuyBlitzRequest {
             symbol: simbolo.to_string(),
             amount: 1.0,
             direction: Direction::Call,
-            expiration_minutes: 30, // en blitz el campo transporta segundos
-            option_type: OptionType::Blitz,
+            expiration_size_secs: 30,
+            profit_percent: payout_blitz,
         })
         .await;
     match blitz {
