@@ -3,7 +3,7 @@
 //! LÍMITES VERIFICADOS CONTRA EL BRÓKER (2026-10-30, EURUSD-op)
 //!   · `count` máximo: 1000. Pedir 2000 o 5000 devuelve 1000 igual.
 //!   · `from`+`to` devuelve 0 velas: el rango no se puede saltar, solo se
-//!     pagina hacia atrás con `to`/`to_id`. El legacy `get-candles` v1.0 con
+//!     pagina hacia atrás con `to`/`to_id`. El canal antiguo `get-candles` v1.0 con
 //!     `from`/`to` no devuelve datos ni error.
 //!   · Retención por tamaño: 1 s y 5 s ≈ 7 días · 1 m 45–90 días ·
 //!     5 m 270–330 días · ≥15 m > 2 años.

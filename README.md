@@ -19,7 +19,7 @@ no se copia ni se modifica.
 | Resultados | Cierre de cada orden por evento, con caché consultable sin latencia de red |
 | Análisis de cuenta | Historial de posiciones con PnL, saldos y tipo de cuenta |
 | Datos de mercado | Perfil fundamental del activo, operaciones de terceros (live-deal) y cambios de comisión |
-| Iconos de arquitectura | Interfaz común `Broker` y registro de adaptadores (multibróker) |
+| Arquitectura | Interfaz común `Broker` y registro de adaptadores (multibróker) |
 
 Características de diseño:
 

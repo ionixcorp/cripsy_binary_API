@@ -433,7 +433,6 @@ a {{ color:var(--acento); }}
   <h1>cripsy_binary_API</h1>
   <div class="sub">API moderna para brókers de opciones binarias</div>
   <input id="buscador" type="search" placeholder="Buscar en la documentación…">
-  <div class="idiomas"><a href="../es/index.html">Español</a><a href="../en/index.html">English</a></div>
   <div id="nav">{nav_html}</div>
 </nav>
 <main id="contenido">{contenido_html}</main>

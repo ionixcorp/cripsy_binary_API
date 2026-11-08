@@ -201,7 +201,7 @@ pub fn expiracion_blitz_alineada(ahora: i64, duracion_segs: u64) -> i64 {
     (ahora / d + 1) * d
 }
 
-/// Tiempo de expiración de binarias/turbo (réplica de `expiration.py`).///
+/// Tiempo de expiración de binarias/turbo (réplica de la lógica del bróker).
 /// Devuelve `(expirado, indice)`. Los primeros 5 candidatos son de minuto
 /// (turbo); el índice decide `option_type_id`: <5 → 3 (turbo), ≥5 → 1 (binary).
 pub fn tiempo_de_expiracion(ahora: i64, duracion_min: u64) -> (i64, usize) {
@@ -974,7 +974,7 @@ mod tests {
 
     #[test]
     fn comision_desde_frame_extrae_valor() {
-        // Forma verificada contra el handler de la referencia.
+        // Forma verificada contra el bróker.
         let msg = json!({
             "instrument_type": "digital-option", "active_id": 76,
             "commission": { "value": 13 }

@@ -13,8 +13,10 @@ Los datos históricos se piden con `get_candles(...)`. Los límites están
 Reglas prácticas:
 
 - `count` máximo por petición: **1000 velas** (pedir más devuelve 1000).
-- `to` debe ser el **cierre de una vela ya cerrada**. Con size=1 funciona
-  `(ahora/60)*60 - 90`; con `to` reciente la respuesta llega vacía.
+- `to` debe ser el **inicio de una vela ya cerrada**. Usa el ayudante
+  `broker::historico::ultimo_cierre(ahora, intervalo)`, que resta un paso al
+  múltiplo del intervalo; con `to` dentro de la vela en curso la respuesta llega
+  vacía.
 - Los datos son contiguos: sin huecos dentro de la ventana disponible.
 
 Tamaños disponibles: 1, 5, 15, 30, 60, 300, 900, 3600, 14400 y 86400 s.

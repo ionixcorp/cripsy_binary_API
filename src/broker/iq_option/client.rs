@@ -245,7 +245,7 @@ impl Broker for IqOptionBroker {
 
     async fn sell_option(&self, order_id: &OrderId) -> Result<(), BrokerError> {
         // Mensaje `sell-options` v2.0 con la lista de ids (verificado contra
-        // el canal de la referencia; el bróker confirma con `sold-options`).
+        // el canal del bróker; el bróker confirma con `sold-options`).
         let id_num = order_id
             .parse::<i64>()
             .map_err(|_| BrokerError::Rejected(format!("id de orden no numerico: {order_id}")))?;

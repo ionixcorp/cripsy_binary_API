@@ -12,7 +12,7 @@ pub enum AccountType {
 /// Balance de una cuenta concreta del bróker.
 ///
 /// Además del monto disponible, expone los campos de riesgo que el bróker
-/// publica y que la API de referencia no capturaba: saldo retenido, bonos,
+/// publica y que el modelo inicial no capturaba: saldo retenido, bonos,
 /// matrículas y si la cuenta ha depositado.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AccountBalance {

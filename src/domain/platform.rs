@@ -1,4 +1,4 @@
-//! Datos de plataforma no capturados por la API de referencia.
+//! Datos de plataforma que el bróker publica y que no estaban en el modelo inicial.
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -62,7 +62,7 @@ pub struct CommissionChange {
 
 /// Perfil fundamental de un activo (GraphQL `GetAssetProfileInfo`).
 ///
-/// Datos que NI la API de referencia NI esta API exponían hasta ahora: nombre
+/// Datos que el bróker publica y que no estaban expuestos hasta ahora: nombre
 /// oficial del bróker, ticker y variaciones de precio a varios plazos.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct AssetProfile {
