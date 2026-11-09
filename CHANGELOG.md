@@ -3,6 +3,19 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/)
 y versionado semántico.
 
+## [0.2.1] - 2026-11-09
+
+### Añadido
+
+- Prueba del recorrido multi-página de la reconciliación con historiales
+  simulados: encuentra cierres en páginas posteriores, corta al localizarlos y
+  respeta el límite de diez páginas.
+
+### Corregido
+
+- Cifras de verificación de la documentación embebida: la medición final de la
+  caída forzada es 4.938 ms sin conexión, con 34 comprobaciones y 0 fallos.
+
 ## [0.2.0] - 2026-11-09
 
 ### Añadido

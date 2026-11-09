@@ -597,63 +597,103 @@ const PÁGINAS_RECONCILIACION: usize = 10;
 /// Tamaño de página del historial (límite del bróker).
 const POSICIONES_POR_PAGINA: usize = 100;
 
-/// Recupera los cierres de las órdenes abiertas recorriendo el historial.
-///
-/// Se detiene al encontrar todas, al recibir una página incompleta o al agotar
-/// [`PÁGINAS_RECONCILIACION`]: una sesión que estuvo caída durante horas no
-/// debe recorrer el historial completo antes de reanudar el despacho.
-async fn reconciliar_pendientes(ws: &mut WsClient, ctx: &Ctx, plazo: std::time::Duration) {
-    let mut faltan = ctx.abiertas.read().await.clone();
-    if faltan.is_empty() {
-        return;
+/// Fuente de páginas de historial (abstracción para probar el recorrido).
+#[async_trait::async_trait]
+trait PaginadorHistorial: Send {
+    async fn pagina(&mut self, offset: usize) -> Result<PositionHistory, BrokerError>;
+}
+
+/// Paginador real: consulta el historial del bróker sobre el socket de trabajo.
+struct PaginadorWs<'a> {
+    ws: &'a mut WsClient,
+    ctx: &'a Ctx,
+    plazo: std::time::Duration,
+}
+
+#[async_trait::async_trait]
+impl PaginadorHistorial for PaginadorWs<'_> {
+    async fn pagina(&mut self, offset: usize) -> Result<PositionHistory, BrokerError> {
+        pedir_historial(self.ws, self.ctx, self.plazo, offset).await
     }
+}
+
+/// Recorre páginas hasta encontrar los cierres pendientes o agotar el límite.
+///
+/// Devuelve los cierres encontrados, los identificadores que siguen sin
+/// aparecer y cuántas páginas se pidieron. Se detiene al encontrarlos todos, al
+/// recibir una página incompleta o al llegar a [`PÁGINAS_RECONCILIACION`]: una
+/// sesión caída durante horas no debe recorrer el historial completo antes de
+/// reanudar el despacho.
+async fn recorrer_paginas(
+    fuente: &mut (dyn PaginadorHistorial + Send),
+    pendientes: &HashSet<OrderId>,
+) -> (Vec<(OrderId, OperationResult)>, HashSet<OrderId>, usize) {
+    let mut faltan = pendientes.clone();
+    let mut encontrados = Vec::new();
+    let mut paginas = 0usize;
 
     for pagina in 0..PÁGINAS_RECONCILIACION {
         let offset = pagina * POSICIONES_POR_PAGINA;
-        let historial = match pedir_historial(ws, ctx, plazo, offset).await {
+        let historial = match fuente.pagina(offset).await {
             Ok(h) => h,
             Err(e) => {
                 tracing::warn!(error = %e, offset, "sin historial: reconciliación incompleta");
-                return;
+                break;
             }
         };
+        paginas += 1;
         if historial.positions.is_empty() {
-            return;
+            break;
         }
         let ultima_pagina = historial.positions.len() < POSICIONES_POR_PAGINA;
 
-        for (id, result) in reconciliar(&faltan, &historial) {
-            let nuevo = {
-                let mut cache = ctx.resultados.write().await;
-                if cache.contains_key(&id) {
-                    false
-                } else {
-                    cache.insert(id.clone(), result);
-                    true
-                }
-            };
-            ctx.abiertas.write().await.remove(&id);
-            faltan.remove(&id);
-            if nuevo {
-                let _ = ctx.eventos.send(Event::OrderClosed { id, result });
-            }
+        let nuevos = reconciliar(&faltan, &historial);
+        for (id, _) in &nuevos {
+            faltan.remove(id);
         }
+        encontrados.extend(nuevos);
 
-        if faltan.is_empty() {
-            return;
-        }
-        if ultima_pagina {
-            tracing::warn!(
-                pendientes = faltan.len(),
-                "cierres no encontrados en el historial"
-            );
-            return;
+        if faltan.is_empty() || ultima_pagina {
+            break;
         }
     }
-    tracing::warn!(
-        pendientes = faltan.len(),
-        "reconciliación agotada sin coincidencias"
-    );
+
+    (encontrados, faltan, paginas)
+}
+
+/// Recupera los cierres de las órdenes abiertas recorriendo el historial.
+async fn reconciliar_pendientes(ws: &mut WsClient, ctx: &Ctx, plazo: std::time::Duration) {
+    let pendientes = ctx.abiertas.read().await.clone();
+    if pendientes.is_empty() {
+        return;
+    }
+
+    let mut fuente = PaginadorWs { ws, ctx, plazo };
+    let (encontrados, faltan, paginas) = recorrer_paginas(&mut fuente, &pendientes).await;
+
+    for (id, result) in encontrados {
+        let nuevo = {
+            let mut cache = ctx.resultados.write().await;
+            if cache.contains_key(&id) {
+                false
+            } else {
+                cache.insert(id.clone(), result);
+                true
+            }
+        };
+        ctx.abiertas.write().await.remove(&id);
+        if nuevo {
+            let _ = ctx.eventos.send(Event::OrderClosed { id, result });
+        }
+    }
+
+    if !faltan.is_empty() {
+        tracing::warn!(
+            pendientes = faltan.len(),
+            paginas,
+            "cierres no encontrados en el historial"
+        );
+    }
 }
 
 /// Historial de posiciones cerradas del balance activo.
@@ -1151,6 +1191,103 @@ mod tests {
                 ("333".to_string(), OperationResult::Equal(1.0)),
             ]
         );
+    }
+
+    /// Posición cerrada sintética para las pruebas de recorrido.
+    fn posicion_simulada(id: &str, pnl: f64) -> Position {
+        Position {
+            id: id.into(),
+            instrument_type: "turbo-option".into(),
+            symbol: "EURUSD".into(),
+            side: Side::Buy,
+            amount: 1.0,
+            open_price: Some(1.1),
+            pnl: Some(pnl),
+            invested: Some(1.0),
+            open_at: 1,
+            close_at: Some(2),
+            leverage: None,
+        }
+    }
+
+    fn historial_simulado(total: usize) -> Vec<Position> {
+        (0..total)
+            .map(|i| posicion_simulada(&i.to_string(), 0.5))
+            .collect()
+    }
+
+    struct PaginadorSimulado {
+        posiciones: Vec<Position>,
+        offsets: Vec<usize>,
+    }
+
+    #[async_trait::async_trait]
+    impl PaginadorHistorial for PaginadorSimulado {
+        async fn pagina(&mut self, offset: usize) -> Result<PositionHistory, BrokerError> {
+            self.offsets.push(offset);
+            let posiciones = if offset >= self.posiciones.len() {
+                Vec::new()
+            } else {
+                let fin = (offset + POSICIONES_POR_PAGINA).min(self.posiciones.len());
+                self.posiciones[offset..fin].to_vec()
+            };
+            Ok(PositionHistory {
+                positions: posiciones,
+                offset,
+                total: Some(self.posiciones.len()),
+            })
+        }
+    }
+
+    /// Un cierre en la tercera página obliga a recorrer las anteriores.
+    #[tokio::test]
+    async fn recorrido_multipagina_encuentra_en_la_tercera() {
+        let mut fuente = PaginadorSimulado {
+            posiciones: historial_simulado(250),
+            offsets: Vec::new(),
+        };
+        let pendientes: HashSet<OrderId> = ["210", "245"].into_iter().map(str::to_string).collect();
+
+        let (encontrados, faltan, paginas) = recorrer_paginas(&mut fuente, &pendientes).await;
+
+        assert_eq!(fuente.offsets, vec![0, 100, 200]);
+        assert_eq!(paginas, 3);
+        assert!(faltan.is_empty(), "debieron encontrarse ambos cierres");
+        assert_eq!(encontrados.len(), 2);
+    }
+
+    /// Si el cierre está en la primera página, no se pide ninguna más.
+    #[tokio::test]
+    async fn recorrido_corta_al_encontrar_todo() {
+        let mut fuente = PaginadorSimulado {
+            posiciones: historial_simulado(150),
+            offsets: Vec::new(),
+        };
+        let pendientes: HashSet<OrderId> = ["7"].into_iter().map(str::to_string).collect();
+
+        let (encontrados, faltan, paginas) = recorrer_paginas(&mut fuente, &pendientes).await;
+
+        assert_eq!(fuente.offsets, vec![0]);
+        assert_eq!(paginas, 1);
+        assert!(faltan.is_empty());
+        assert_eq!(encontrados.len(), 1);
+    }
+
+    /// Sin coincidencias se recorre hasta el límite y se informa lo pendiente.
+    #[tokio::test]
+    async fn recorrido_respeta_el_limite_de_paginas() {
+        let mut fuente = PaginadorSimulado {
+            posiciones: historial_simulado(POSICIONES_POR_PAGINA * PÁGINAS_RECONCILIACION),
+            offsets: Vec::new(),
+        };
+        let pendientes: HashSet<OrderId> = ["999999"].into_iter().map(str::to_string).collect();
+
+        let (encontrados, faltan, paginas) = recorrer_paginas(&mut fuente, &pendientes).await;
+
+        assert_eq!(paginas, PÁGINAS_RECONCILIACION);
+        assert_eq!(fuente.offsets.len(), PÁGINAS_RECONCILIACION);
+        assert!(encontrados.is_empty());
+        assert_eq!(faltan.len(), 1, "el pendiente debe seguir informado");
     }
 
     /// Un fallo de credenciales es terminal; uno de red se reintenta.
