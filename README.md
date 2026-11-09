@@ -191,6 +191,7 @@ Compilación manual:
 ```powershell
 cargo build --release                                            # async (por defecto)
 cargo build --release --no-default-features --features blocking  # sync
+```
 
 ### Python (binding nativo)
 
@@ -226,7 +227,6 @@ Option; en Deriv se rechazan de forma explícita.
 
 Estado de PyPI, instalación desde el repositorio y límites:
 [`docs/python/01_python.es.md`](docs/python/01_python.es.md).
-```
 
 Las credenciales se leen del entorno. `.env` está ignorado por git:
 
