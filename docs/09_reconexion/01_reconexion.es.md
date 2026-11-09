@@ -99,5 +99,5 @@ usar `downtime_ms` para medir la indisponibilidad real.
 
 La suite viva fuerza la caída del socket y comprueba el ciclo completo:
 `Disconnected`, reconexión, operativa posterior y replay de una suscripción.
-Última ejecución: 1 intento de reconexión, 5.710 ms sin conexión y vela
+Última ejecución: 1 intento de reconexión, 4.938 ms sin conexión y vela
 recibida tras volver; 34 comprobaciones, 0 fallos.
