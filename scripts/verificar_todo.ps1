@@ -6,12 +6,12 @@ param([switch]$SoloLectura)
 $ErrorActionPreference = "Stop"
 
 Write-Host "===== IQ Option ====="
-& (Join-Path $PSScriptRoot "verificar_iqoption.ps1") -SoloLectura:$SoloLectura
+& (Join-Path $PSScriptRoot "iqoption\verificar_iqoption.ps1") -SoloLectura:$SoloLectura
 $iq = $LASTEXITCODE
 
 Write-Host ""
 Write-Host "===== Deriv ====="
-& (Join-Path $PSScriptRoot "verificar_deriv.ps1") -SoloLectura:$SoloLectura
+& (Join-Path $PSScriptRoot "deriv\verificar_deriv.ps1") -SoloLectura:$SoloLectura
 $deriv = $LASTEXITCODE
 
 if ($iq -eq 0 -and $deriv -eq 0) {

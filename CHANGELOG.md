@@ -3,6 +3,35 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/)
 y versionado semántico.
 
+## [0.3.1] - 2026-11-09
+
+### Añadido
+
+- `Broker::iqoption_extras` como acceso opcional y compatible a las capacidades
+  exclusivas de IQ Option desde un `Box<dyn Broker>`; los adaptadores que no las
+  ofrecen devuelven `None`.
+- Binding Python: `buy_digital`, `buy_blitz` e `indicators`, con rechazo
+  explícito en Deriv en lugar de simular esas capacidades.
+- Wheels para Linux x64/arm64, Windows x64/arm64 y macOS Intel/arm64, además del
+  sdist.
+- Publicación en PyPI del paquete Python 0.3.1.
+
+### Cambiado
+
+- Documentación separada por bróker: `docs/iqoption/` y `docs/deriv/`, con
+  subcarpetas de cuenta, mercado, órdenes y operativa; Python y herramientas
+  tienen su propia carpeta.
+- Scripts globales en `scripts/` y verificadores/cargadores por bróker en
+  `scripts/iqoption/` y `scripts/deriv/`.
+- Assets fuera de `docs/`: el banner y el QR viven en `img/`.
+- El generador de documentación agrupa por bróker y ordena la navegación.
+
+### Corregido
+
+- La documentación de Deriv ya no afirma que el payout se consulte por importe:
+  `get_payout` usa activo y duración.
+- Enlaces y rutas de scripts actualizados tras la reorganización.
+
 ## [0.3.0] - 2026-11-09
 
 ### Añadido
@@ -33,7 +62,7 @@ y versionado semántico.
 
 - Alcance del producto: operación rise/fall, datos para cualquier activo y
   densidad de ticks nativa como diferencial; expansión futura fuera de alcance.
-- `docs/10_deriv/01_deriv.es.md`: uso de Deriv, credenciales, límites y
+- `docs/deriv/01_introduccion.es.md`: uso de Deriv, credenciales, límites y
   diferencias con IQ Option.
 - Tabla de densidad medida por clase de activo y separación de los scripts de
   verificación (`verificar_iqoption.ps1`, `verificar_deriv.ps1`,
@@ -78,7 +107,7 @@ y versionado semántico.
   ejercitar la recuperación en pruebas de resiliencia.
 - La verificación viva incluye una caída forzada del socket con comprobación de
   `Disconnected`, `Reconnected`, operativa posterior y replay de suscripciones.
-- `docs/09_reconexion/01_reconexion.es.md` con el diseño y los límites del
+- `docs/iqoption/04_operativa/02_reconexion.es.md` con el diseño y los límites del
   supervisor de sesión, más la sección de continuidad del README.
 - `Broker::buy_blitz` con `BuyBlitzRequest`: la duración viaja en segundos y el
   payout se puede indicar de forma explícita. `buy_binary` deja de transportar

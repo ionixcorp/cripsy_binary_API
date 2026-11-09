@@ -4,7 +4,8 @@ Todo lo necesario para instalar, verificar y desarrollar está en tres lugares:
 
 - `installation/` — instalación guiada y verificación del entorno.
 - `scripts/` — compuerta de calidad, generación de la documentación y scripts
-  listos para usar contra el bróker.
+  listos para usar. Los globales quedan en la raíz; los de cada bróker viven en
+  `scripts/iqoption/` y `scripts/deriv/`.
 - `examples/` — uso real de la API (lectura, consumo sincrónico y una orden demo).
 
 ## Instalación guiada
@@ -44,7 +45,7 @@ documentación. Es el estándar mínimo antes de dar un cambio por bueno.
 ## Regenerar la documentación navegable
 
 ```powershell
-.\scriptsuild_docs.ps1 -Lang es
+.\scripts\build_docs.ps1 -Lang es
 ```
 
 Convierte `docs/**/*.es.md` en un único HTML navegable en `docs/site/es/`. El
@@ -57,25 +58,30 @@ funciona también sin servidor (`file://`, navegación por hash y sin `fetch`).
 
 ## Scripts listos para usar
 
-Todas leen tus credenciales de `.env` y operan en cuenta **demo**:
+Los scripts globales y los de cada bróker leen tus credenciales de `.env` y
+operan en cuenta **demo**:
 
 | Script | Bróker | Qué hace |
 |---|---|---|
-| `scripts\conectar.ps1` | IQ Option | Sesión, balance, catálogo, velas y stream (solo lectura) |
-| `scripts\balance.ps1` | IQ Option | Balance, tipo de cuenta y `balance_id` |
-| `scripts\operar.ps1` | IQ Option | Orden de 1 USD en demo y cierre por evento (pide confirmación) |
-| `scripts\verificar_iqoption.ps1` | IQ Option | Valida sus capacidades y reporta `[OK]`/`[FALLO]` |
-| `scripts\verificar_deriv.ps1` | Deriv | Público, ticks, densidad, órdenes y caídas en demo |
+| `scripts\verify.ps1` | — | Compuerta: fmt, clippy, tests, blocking y documentación |
+| `scripts\build_docs.ps1` | — | Genera el HTML navegable desde Markdown |
 | `scripts\verificar_todo.ps1` | Ambos | Ejecuta los dos verificadores en secuencia |
+| `scripts\iqoption\conectar.ps1` | IQ Option | Sesión, balance, catálogo, velas y stream (solo lectura) |
+| `scripts\iqoption\balance.ps1` | IQ Option | Balance, tipo de cuenta y `balance_id` |
+| `scripts\iqoption\operar.ps1` | IQ Option | Orden de 1 USD en demo y cierre por evento (pide confirmación) |
+| `scripts\iqoption\verificar_iqoption.ps1` | IQ Option | Valida sus capacidades y reporta `[OK]`/`[FALLO]` |
+| `scripts\deriv\verificar_deriv.ps1` | Deriv | Público, ticks, densidad, órdenes y caídas en demo |
 
 ```powershell
-.\scripts\verificar_iqoption.ps1            # IQ Option, incluye órdenes demo
-.\scripts\verificar_iqoption.ps1 -SoloLectura
-.\scripts\verificar_deriv.ps1               # Deriv, incluye órdenes y caídas
-.\scripts\verificar_deriv.ps1 -SoloLectura  # solo mercado y ticks
-.\scripts\verificar_todo.ps1                # ambos
+.\scripts\iqoption\verificar_iqoption.ps1            # IQ Option, incluye órdenes demo
+.\scripts\iqoption\verificar_iqoption.ps1 -SoloLectura
+.\scripts\deriv\verificar_deriv.ps1                  # Deriv, incluye órdenes y caídas
+.\scripts\deriv\verificar_deriv.ps1 -SoloLectura     # solo mercado y ticks
+.\scripts\verificar_todo.ps1                         # ambos
 ```
 
+Cada carpeta de bróker incluye su cargador de `.env` (`_env.ps1` en IQ Option,
+`_env_deriv.ps1` en Deriv). Son internos: no hace falta invocarlos a mano.
 `verificar_deriv.ps1` usa el modo público si no hay token; para operar exige
 `DERIV_TOKEN` y `DERIV_APPID` en `.env`.
 
@@ -107,7 +113,8 @@ la cuenta o tienes autorización explícita.
 3. Escribir el mapper dominio ↔ protocolo del bróker.
 4. Si hay capacidades exclusivas, exponerlas en un trait propio (como
    `IqOptionExtras`) en vez de ampliar `Broker`.
-5. Registrar en `BrokerRegistry` y añadir su verificador en `scripts/`.
+5. Registrar en `BrokerRegistry` y añadir su verificador en
+   `scripts/<nombre>/`.
 
 No se modifica ni el dominio ni el transporte: los brókers nuevos se añaden
 como adaptadores.

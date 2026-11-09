@@ -123,7 +123,7 @@ dependencies = [
 
 [[package]]
 name = "cripsy-binary-api"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "async-trait",
  "futures-core",
@@ -140,7 +140,7 @@ dependencies = [
 
 [[package]]
 name = "cripsy-binary-api-python"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "cripsy-binary-api",
  "futures-util",

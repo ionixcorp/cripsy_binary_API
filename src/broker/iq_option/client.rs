@@ -48,6 +48,10 @@ impl Broker for IqOptionBroker {
 
     // -------- Cuenta y balance --------
 
+    fn iqoption_extras(&self) -> Option<&dyn crate::broker::extras::IqOptionExtras> {
+        Some(self)
+    }
+
     async fn get_balance(&self) -> Result<Balance, BrokerError> {
         let estado = self.estado_lectura().await;
         let balance_id = estado

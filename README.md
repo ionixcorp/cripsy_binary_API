@@ -1,6 +1,6 @@
 # cripsy_binary_API
 
-![cripsy_binary_API: cliente Rust multibróker de opciones binarias](https://raw.githubusercontent.com/ionixcorp/cripsy_binary_API/master/docs/assets/banner.svg)
+![cripsy_binary_API: cliente Rust multibróker de opciones binarias](https://raw.githubusercontent.com/ionixcorp/cripsy_binary_API/master/img/banner.svg)
 
 [![Licencia: MIT](https://img.shields.io/badge/licencia-MIT-blue.svg)](LICENSE)
 [![Rust 1.86+](https://img.shields.io/badge/rust-1.86%2B-orange.svg)](https://www.rust-lang.org)
@@ -69,7 +69,7 @@ sin polling.
 
 ## 📌 Estado del proyecto
 
-Versión `0.3.0`. Cada componente se probó mediante conexiones reales contra el
+Versión `0.3.1`. Cada componente se probó mediante conexiones reales contra el
 bróker (cuenta de práctica) el 8 y 9 de noviembre de 2026.
 
 **IQ Option**
@@ -161,7 +161,7 @@ no se reintenta, para no bloquear la cuenta.
 Lo que **no** debe hacer el consumidor: reconectar por su cuenta, repetir el
 login ante un error de red, o resuscribir streams tras `Reconnected`. El diseño,
 los límites y la personalización están en
-[`docs/09_reconexion/01_reconexion.es.md`](docs/09_reconexion/01_reconexion.es.md).
+[`docs/iqoption/04_operativa/02_reconexion.es.md`](docs/iqoption/04_operativa/02_reconexion.es.md).
 
 ## 📦 Instalación
 
@@ -199,8 +199,11 @@ IQ Option y Deriv. El crate de crates.io no cambia: el binding es un paquete
 independiente en `python/`.
 
 ```powershell
-pip install https://github.com/ionixcorp/cripsy_binary_API/releases/download/v0.3.0/cripsy_binary_api-0.3.0-cp310-abi3-win_amd64.whl
+pip install https://github.com/ionixcorp/cripsy_binary_API/releases/download/v0.3.1/cripsy_binary_api-0.3.1-cp310-abi3-win_amd64.whl
 ```
+
+Hay wheels para Linux x64, Windows x64 y macOS arm64 en el mismo release,
+además del sdist.
 
 ```python
 from cripsy_binary_api import Client
@@ -210,8 +213,11 @@ print(len(cliente.assets()), "activos")
 cliente.close()
 ```
 
+El `Client` expone además `buy_digital`, `buy_blitz` e `indicators` para IQ
+Option; en Deriv se rechazan de forma explícita.
+
 Estado de PyPI, instalación desde el repositorio y límites:
-[`docs/11_python/01_python.es.md`](docs/11_python/01_python.es.md).
+[`docs/python/01_python.es.md`](docs/python/01_python.es.md).
 ```
 
 Las credenciales se leen del entorno. `.env` está ignorado por git:
@@ -232,12 +238,12 @@ Los scripts incluidos ejecutan comprobaciones reales contra el bróker. Leen
 `.env`, usan la cuenta de práctica y no requieren configuración adicional:
 
 ```powershell
-.\scripts\conectar.ps1            # IQ Option: sesión, balance, catálogo, velas y stream
-.\scripts\balance.ps1             # IQ Option: balance, tipo de cuenta y balance_id
-.\scripts\operar.ps1              # IQ Option: orden de 1 USD en demo y cierre por evento
-.\scripts\verificar_iqoption.ps1  # IQ Option: 34 comprobaciones
-.\scripts\verificar_deriv.ps1     # Deriv: público, ticks, órdenes y caídas en demo
-.\scripts\verificar_todo.ps1      # ambos, en secuencia
+.\scripts\iqoption\conectar.ps1            # IQ Option: sesión, balance, catálogo, velas y stream
+.\scripts\iqoption\balance.ps1             # IQ Option: balance, tipo de cuenta y balance_id
+.\scripts\iqoption\operar.ps1              # IQ Option: orden de 1 USD en demo y cierre por evento
+.\scripts\iqoption\verificar_iqoption.ps1  # IQ Option: verificación integral
+.\scripts\deriv\verificar_deriv.ps1        # Deriv: público, ticks, órdenes y caídas en demo
+.\scripts\verificar_todo.ps1               # ambos, en secuencia
 ```
 
 Cada verificador informa `[OK]`, `[FALLO]` o `[AVISO]` por capacidad y termina
@@ -271,19 +277,21 @@ cargo run --example deriv_reconciliacion # Deriv: cierre ocurrido sin red
 - En línea: <https://ionixcorp.github.io/cripsy_binary_API/>
 - En el repositorio: [`docs/`](docs/) (Markdown, fuente de verdad)
 
-| Documento | Contenido |
-|---|---|
-| [Introducción](docs/01_introduccion.es.md) | Alcance, estado de cada componente y qué no hace |
-| [Sesión y cuentas](docs/02_account/01_sesion_cuentas.es.md) | Conexión, cuentas y balances |
-| [Históricos](docs/03_candle_and_stream/01_historicos.es.md) | Límites por intervalo y descarga masiva |
-| [Stream y ticks](docs/03_candle_and_stream/02_stream_ticks.es.md) | Suscripciones y densidad de ticks |
-| [Fachada síncrona](docs/03_candle_and_stream/03_fachada_sincrona.es.md) | Consumo bloqueante |
-| [Digital](docs/04_digital/01_digital.es.md) · [Binary](docs/05_binary/01_binary.es.md) · [Blitz](docs/06_blitz/01_blitz.es.md) | Tipos de orden |
-| [Herramientas](docs/07_herramientas/01_herramientas.es.md) | Instalación, scripts y adaptadores |
-| [Indicadores](docs/08_indicadores/01_indicadores.es.md) | Canal de indicadores del bróker |
-| [Reconexión](docs/09_reconexion/01_reconexion.es.md) | Continuidad: qué resuelve la API y qué debe hacer el consumidor |
-| [Deriv](docs/10_deriv/01_deriv.es.md) | Adaptador Deriv: alcance, credenciales, densidad, límites y reconciliación |
-| [Python](docs/11_python/01_python.es.md) | Binding PyO3/maturin: instalación, superficie y límites |
+| Grupo | Documento | Contenido |
+|---|---|---|
+| General | [Introducción](docs/01_introduccion.es.md) | Alcance, estado de cada componente y qué no hace |
+| IQ Option | [Cuenta](docs/iqoption/01_cuenta/01_sesion_cuentas.es.md) | Conexión, cuentas y balances |
+| IQ Option | [Mercado](docs/iqoption/02_mercado/01_historicos.es.md) | Históricos, stream, ticks y fachada síncrona |
+| IQ Option | [Órdenes](docs/iqoption/03_ordenes/01_binary.es.md) | Binary, digital y blitz |
+| IQ Option | [Operativa](docs/iqoption/04_operativa/02_reconexion.es.md) | Indicadores del bróker y reconexión |
+| Deriv | [Introducción](docs/deriv/01_introduccion.es.md) | Alcance, modos y estado |
+| Deriv | [Cuenta](docs/deriv/02_cuenta/01_cuentas_identificadores.es.md) | PAT, OTP, cuentas e identificadores |
+| Deriv | [Mercado](docs/deriv/03_mercado/01_catalogo_velas_ticks.es.md) | Catálogo, velas, ticks, payout y densidad |
+| Deriv | [Órdenes](docs/deriv/04_ordenes/01_rise_fall_historial.es.md) | Rise/fall, cierre por evento e historial |
+| Deriv | [Operativa](docs/deriv/05_operativa/01_reconexion_reconciliacion.es.md) | Reconexión y reconciliación |
+| Deriv | [Límites](docs/deriv/06_limites/01_limites.es.md) | Cupos y capacidades no soportadas |
+| Python | [Binding](docs/python/01_python.es.md) | PyO3/maturin: instalación, superficie y límites |
+| General | [Herramientas](docs/herramientas/01_herramientas.es.md) | Instalación, scripts y adaptadores |
 
 Para generar la documentación navegable en local:
 
@@ -396,7 +404,7 @@ quieres contribuir a sostenerlo, puedes enviar una donación por Binance Pay.
 Es totalmente opcional: no desbloquea funciones, no cambia la prioridad de los
 issues y no condiciona el soporte.
 
-<img src="https://raw.githubusercontent.com/ionixcorp/cripsy_binary_API/master/docs/assets/donacion-binance.png" alt="Código QR de Binance Pay para donaciones" width="220">
+<img src="https://raw.githubusercontent.com/ionixcorp/cripsy_binary_API/master/img/donacion-binance.png" alt="Código QR de Binance Pay para donaciones" width="220">
 
 **Alias de Binance Pay:** `CripSy-AGKY`
 

@@ -18,7 +18,8 @@ use ::cripsy_binary_api::broker::{
     IqOptionConfig,
 };
 use ::cripsy_binary_api::domain::{
-    BuyBinaryRequest, CandleRequest, Direction, Event, OptionType,
+    BuyBinaryRequest, BuyBlitzRequest, BuyDigitalRequest, CandleRequest, Direction, Event,
+    OptionType,
 };
 use futures_util::StreamExt;
 use pyo3::create_exception;
@@ -372,6 +373,99 @@ impl Client {
             })
         })
         .map_err(broker_error)
+    }
+
+    /// Compra digital (solo IQ Option). `strike=0` deja que el bróker elija
+    /// el instrumento spot del periodo.
+    #[pyo3(signature = (symbol, amount, direction="call", minutes=1, strike=0.0))]
+    fn buy_digital(
+        &self,
+        py: Python<'_>,
+        symbol: String,
+        amount: f64,
+        direction: &str,
+        minutes: u64,
+        strike: f64,
+    ) -> PyResult<String> {
+        let req = BuyDigitalRequest {
+            symbol,
+            amount,
+            direction: direccion(direction)?,
+            duration_minutes: minutes,
+            strike,
+        };
+        let broker = Arc::clone(&self.broker);
+        let rt = Arc::clone(&self.rt);
+        py.allow_threads(move || {
+            rt.block_on(async move {
+                let b = broker.lock().await;
+                let extras = b.iqoption_extras().ok_or_else(|| {
+                    BrokerError::Rejected(format!(
+                        "{}: el bróker no ofrece opciones digitales",
+                        b.name()
+                    ))
+                })?;
+                extras.buy_digital_spot(req).await
+            })
+        })
+        .map_err(broker_error)
+    }
+
+    /// Compra BLITZ (solo IQ Option); `seconds` es la duración admitida por el
+    /// activo. `profit_percent=0` usa el payout del catálogo.
+    #[pyo3(signature = (symbol, amount, direction="call", seconds=60, profit_percent=0.0))]
+    fn buy_blitz(
+        &self,
+        py: Python<'_>,
+        symbol: String,
+        amount: f64,
+        direction: &str,
+        seconds: u64,
+        profit_percent: f64,
+    ) -> PyResult<String> {
+        let req = BuyBlitzRequest {
+            symbol,
+            amount,
+            direction: direccion(direction)?,
+            expiration_size_secs: seconds,
+            profit_percent,
+        };
+        let broker = Arc::clone(&self.broker);
+        let rt = Arc::clone(&self.rt);
+        py.allow_threads(move || {
+            rt.block_on(async move {
+                let b = broker.lock().await;
+                let extras = b.iqoption_extras().ok_or_else(|| {
+                    BrokerError::Rejected(format!(
+                        "{}: el bróker no ofrece opciones blitz",
+                        b.name()
+                    ))
+                })?;
+                extras.buy_blitz(req).await
+            })
+        })
+        .map_err(broker_error)
+    }
+
+    /// Indicadores técnicos publicados por el bróker (solo IQ Option).
+    fn indicators(&self, py: Python<'_>, symbol: String) -> PyResult<PyObject> {
+        let broker = Arc::clone(&self.broker);
+        let rt = Arc::clone(&self.rt);
+        let indicadores = py
+            .allow_threads(move || {
+                rt.block_on(async move {
+                    let b = broker.lock().await;
+                    let extras = b.iqoption_extras().ok_or_else(|| {
+                        BrokerError::Rejected(format!(
+                            "{}: el bróker no publica indicadores técnicos",
+                            b.name()
+                        ))
+                    })?;
+                    extras.get_technical_indicators(&symbol).await
+                })
+            })
+            .map_err(broker_error)?;
+        to_py(py, &indicadores)
     }
 
     /// Venta anticipada de una orden abierta.

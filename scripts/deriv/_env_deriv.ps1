@@ -1,6 +1,6 @@
 # Carga .env para Deriv. Exige token solo cuando se va a operar.
 param([switch]$Operar)
-$raiz = Split-Path -Parent $PSScriptRoot
+$raiz = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Set-Location -LiteralPath $raiz
 
 $archivo = Join-Path $raiz ".env"

@@ -7,7 +7,7 @@ import cripsy_binary_api as api
 
 class BindingBasico(unittest.TestCase):
     def test_version(self):
-        self.assertEqual(api.__version__, "0.3.0")
+        self.assertEqual(api.__version__, "0.3.1")
 
     def test_brokers(self):
         self.assertEqual(api.BROKERS, ["iq_option", "deriv"])
@@ -18,7 +18,15 @@ class BindingBasico(unittest.TestCase):
         self.assertTrue(issubclass(api.CripsyError, Exception))
 
     def test_metodos_de_orden_presentes(self):
-        for metodo in ("buy", "sell", "wait_result", "ticks"):
+        for metodo in (
+            "buy",
+            "buy_digital",
+            "buy_blitz",
+            "indicators",
+            "sell",
+            "wait_result",
+            "ticks",
+        ):
             self.assertTrue(hasattr(api.Client, metodo))
 
 

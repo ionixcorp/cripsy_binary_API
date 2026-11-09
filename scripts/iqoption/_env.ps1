@@ -1,5 +1,5 @@
 # Carga las credenciales de .env en la sesión actual (nunca las imprime).
-$raiz = Split-Path -Parent $PSScriptRoot
+$raiz = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Set-Location -LiteralPath $raiz
 
 $archivo = Join-Path $raiz ".env"

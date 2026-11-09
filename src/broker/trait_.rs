@@ -10,6 +10,7 @@ use crate::domain::{
 
 use super::config::BrokerParams;
 use super::error::BrokerError;
+use super::extras::IqOptionExtras;
 use super::session::Session;
 
 /// Stream async de velas.
@@ -98,6 +99,12 @@ pub trait Broker: Send + Sync {
         &self,
         order_id: &OrderId,
     ) -> Result<OperationResult, BrokerError>;
+
+    /// Acceso a las capacidades exclusivas de IQ Option, si el adaptador las
+    /// ofrece. Los adaptadores que no las implementan devuelven `None`.
+    fn iqoption_extras(&self) -> Option<&dyn IqOptionExtras> {
+        None
+    }
 
     /// Suscribe el stream **nativo** de ticks de un activo.
     ///

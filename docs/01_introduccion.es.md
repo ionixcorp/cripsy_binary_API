@@ -64,18 +64,21 @@ opciones binarias. Diseñada desde cero, con estas propiedades:
 Todas las llamadas del trait `Broker` son `async` y devuelven
 `Result<_, BrokerError>` (salvo `name()` e `is_connected()`).
 
-| Sección | Contenido |
-|---|---|
-| 02 · Account | Conexión, cuentas (demo/real), balances |
-| 03 · Candle & Stream | Históricos, límites, velas en vivo, ticks y fachada sincrónica |
-| 04 · Digital | Compra digital v2 y ciclo de vida |
-| 05 · Binary | Órdenes clásicas turbo/binary |
-| 06 · Blitz | Órdenes blitz y rollovers |
-| 07 · Herramientas | Instalación, verificación y cómo añadir otro bróker |
-| 08 · Indicadores | Indicadores del bróker: estado y alternativas |
-| 09 · Reconexión | Supervisión de sesión, replay de suscripciones y límites |
-| 10 · Deriv | Adaptador Deriv: alcance, credenciales, densidad y límites |
-| 11 · Python | Binding PyO3/maturin: instalación, superficie y límites |
+| Grupo | Documento | Contenido |
+|---|---|---|
+| General | `docs/01_introduccion.es.md` | Alcance, estado y qué no hace |
+| IQ Option | `docs/iqoption/01_cuenta/01_sesion_cuentas.es.md` | Conexión, cuentas demo/real y balances |
+| IQ Option | `docs/iqoption/02_mercado/01_historicos.es.md` | Históricos, límites, velas en vivo, ticks y fachada sincrónica |
+| IQ Option | `docs/iqoption/03_ordenes/01_binary.es.md` | Clásicas, digitales v2 y blitz |
+| IQ Option | `docs/iqoption/04_operativa/02_reconexion.es.md` | Indicadores del bróker y reconexión |
+| Deriv | `docs/deriv/01_introduccion.es.md` | Alcance, modos público/autenticado y estado |
+| Deriv | `docs/deriv/02_cuenta/01_cuentas_identificadores.es.md` | PAT, OTP, cuentas e identificadores |
+| Deriv | `docs/deriv/03_mercado/01_catalogo_velas_ticks.es.md` | Catálogo, velas, ticks, payout y densidad |
+| Deriv | `docs/deriv/04_ordenes/01_rise_fall_historial.es.md` | Rise/fall, cierre por evento e historial |
+| Deriv | `docs/deriv/05_operativa/01_reconexion_reconciliacion.es.md` | Reconexión y reconciliación de cierres |
+| Deriv | `docs/deriv/06_limites/01_limites.es.md` | Cupos y capacidades no soportadas |
+| Python | `docs/python/01_python.es.md` | PyO3/maturin: instalación, superficie y límites |
+| General | `docs/herramientas/01_herramientas.es.md` | Instalación, scripts y cómo añadir otro bróker |
 
 ## Requisitos
 

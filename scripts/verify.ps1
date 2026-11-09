@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 # Compuerta local completa: fmt + clippy + test + build (ambas variantes).
 $ErrorActionPreference = "Stop"
-Set-Location -LiteralPath $PSScriptRoot
+Set-Location -LiteralPath (Split-Path -Parent $PSScriptRoot)
 
 Write-Host "== cargo fmt --check =="
 cargo fmt --check

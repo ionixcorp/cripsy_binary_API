@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "cripsy-binary-api"
-version = "0.3.0"
+version = "0.3.1"
 description = "Bindings Python para cripsy-binary-api: IQ Option y Deriv (opciones binarias)"
 readme = "README.md"
 requires-python = ">=3.10"

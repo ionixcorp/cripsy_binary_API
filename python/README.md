@@ -13,6 +13,6 @@ cliente.close()
 ```
 
 La documentación completa, límites y credenciales están en
-[`docs/11_python/01_python.es.md`](https://github.com/ionixcorp/cripsy_binary_API/blob/master/docs/11_python/01_python.es.md).
+[`docs/python/01_python.es.md`](https://github.com/ionixcorp/cripsy_binary_API/blob/master/docs/python/01_python.es.md).
 
 Licencia MIT. Proyecto independiente: no afiliado a IQ Option ni a Deriv.

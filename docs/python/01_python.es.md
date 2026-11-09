@@ -18,9 +18,9 @@ gana dependencias**: `cargo add cripsy-binary-api` sigue igual.
 
 | Canal | Estado |
 |---|---|
-| crates.io (`cripsy-binary-api` 0.3.0) | Publicado y verificado |
-| GitHub Release `v0.3.0` | Con wheel de Windows x64 y sdist adjuntos |
-| PyPI | Código y workflow listos; **pendiente de `PYPI_API_TOKEN`** |
+| crates.io (`cripsy-binary-api` 0.3.1) | Publicado y verificado |
+| GitHub Release `v0.3.1` | Wheels Linux x64/arm64, Windows x64/arm64, macOS Intel/arm64 y sdist |
+| PyPI | Publicación de 0.3.1 en curso |
 
 El wheel es `abi3` para CPython 3.10 o superior. Mientras PyPI no tenga el
 paquete, las dos formas reales de instalar son el wheel del release y la
@@ -28,16 +28,25 @@ instalación desde el repositorio.
 
 ## Instalación
 
-### Wheel del release (Windows x64)
+### Wheels del release
 
 ```powershell
-pip install https://github.com/ionixcorp/cripsy_binary_API/releases/download/v0.3.0/cripsy_binary_api-0.3.0-cp310-abi3-win_amd64.whl
+# Windows x64
+pip install https://github.com/ionixcorp/cripsy_binary_API/releases/download/v0.3.1/cripsy_binary_api-0.3.1-cp310-abi3-win_amd64.whl
+```
+
+```bash
+# Linux x86_64
+pip install https://github.com/ionixcorp/cripsy_binary_API/releases/download/v0.3.1/cripsy_binary_api-0.3.1-cp310-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+
+# macOS arm64
+pip install https://github.com/ionixcorp/cripsy_binary_API/releases/download/v0.3.1/cripsy_binary_api-0.3.1-cp310-abi3-macosx_11_0_arm64.whl
 ```
 
 ### Desde el repositorio (cualquier plataforma con Rust 1.86+)
 
 ```powershell
-pip install "cripsy-binary-api @ git+https://github.com/ionixcorp/cripsy_binary_API.git@v0.3.0#subdirectory=python"
+pip install "cripsy-binary-api @ git+https://github.com/ionixcorp/cripsy_binary_API.git@v0.3.1#subdirectory=python"
 ```
 
 pip instala maturin como backend de build y compila el módulo. Requiere Rust y
@@ -108,6 +117,8 @@ finally:
 |---|---|---|
 | `Client.connect_deriv(...)` | `Client` | sin token: público |
 | `Client.connect_iqoption(...)` | `Client` | `practice=True` por defecto |
+| `name()` | str | `iq_option` o `deriv` |
+| `is_connected()` | bool | estado del socket |
 | `assets()` | lista de dicts | catálogo completo |
 | `candles(symbol, interval, count)` | lista de dicts | `interval` en segundos |
 | `asset_status(symbol)` | str | `Open` / `Closed` / `Suspended` |
@@ -116,6 +127,9 @@ finally:
 | `history(limit, offset, symbol)` | dict | posiciones cerradas |
 | `ticks(symbol, seconds)` | lista de dicts | stream nativo, sin polling |
 | `buy(symbol, amount, direction, minutes)` | str | `call` / `put`; demo |
+| `buy_digital(symbol, amount, direction, minutes, strike)` | str | solo IQ Option |
+| `buy_blitz(symbol, amount, direction, seconds, profit_percent)` | str | solo IQ Option |
+| `indicators(symbol)` | dict | solo IQ Option |
 | `sell(order_id)` | `None` | venta anticipada |
 | `result(order_id)` | `Win`/`Loss`/`Equal`/`Pending` | lee caché |
 | `wait_result(order_id, timeout_secs)` | igual | espera el evento |
@@ -128,8 +142,8 @@ Los dicts conservan los nombres del dominio Rust (`symbol`, `close`,
 
 - **Superficie sincrónica.** Cada llamada bloquea el hilo de Python; el GIL se
   libera durante la espera. Para concurrencia, usa un `Client` por hilo.
-- **Sin blitz, digital ni indicadores.** El binding expone rise/fall, que es el
-  alcance del producto. Esas capacidades siguen disponibles solo desde Rust.
+- **Digital, blitz e indicadores solo en IQ Option.** El binding los expone y
+  Deriv los rechaza con `CripsyError`; no se simulan sobre rise/fall.
 - **Sin `asyncio`.** No hay `await` en Python todavía; el núcleo async se usa
   internamente.
 - **Una sesión por `Client`.** `close()` es obligatorio para liberar el socket.

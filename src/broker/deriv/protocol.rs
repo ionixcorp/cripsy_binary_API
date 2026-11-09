@@ -14,7 +14,7 @@ use crate::domain::{
 /// Cuenta numérica estable a partir del id de cuenta de Deriv.
 ///
 /// Deriv identifica cuentas con cadenas (`CR…`, `VRTC…`); el dominio usa `i64`.
-/// Hasta que el contrato admita cadenas (0.3.0), este valor es un **sustituto
+/// Hasta que el contrato admita cadenas (0.3.x), este valor es un **sustituto
 /// determinista**, no un identificador del bróker.
 pub fn id_surrogado(account_id: &str) -> i64 {
     let mut hash: u64 = 0xcbf2_9ce4_8422_2325;

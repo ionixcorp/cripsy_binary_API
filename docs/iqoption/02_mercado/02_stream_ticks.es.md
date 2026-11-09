@@ -59,24 +59,10 @@ Hallazgos clave:
 - La densidad exacta depende de la liquidez y el horario del activo; los
   ejemplos miden mercados OTC de fin de semana.
 
-## 3. Densidad medida en Deriv
+## 3. Densidad en Deriv
 
-Gateway público, ventana de 8 s, 2026-11-09:
-
-| Activo | Clase | Ticks | Densidad | Hueco medio |
-|---|---|---|---|---|
-| `R_100` | índice sintético (2 s) | 4 | ≈0,5/s | 1 993 ms |
-| `1HZ100V` | índice sintético (1 s) | 8 | 1,0/s | 998 ms |
-| `1HZ10V` | índice sintético (1 s) | 8 | 1,0/s | 1 002 ms |
-| `frxAUDCAD` | forex | 8 | 1,0/s | 1 002 ms |
-| `cryBTCUSD` | cripto | 8 | 1,0/s | 998 ms |
-| `frxXAGUSD` | materia prima | 6–8 | 0,75–1,0/s | 1 000–1 183 ms |
-
-La cadencia la fija el producto: los índices de 2 s entregan un tick cada 2 s;
-forex y cripto llegan agregados a ~1/s por el gateway público. No es polling:
-se entrega el stream del bróker tal cual. La materia prima osciló entre 0,75 y
-1,0/s entre pasadas. Faltan mediciones con credenciales y en horario de mercado
-pleno; no se extrapolan.
+La densidad medida, la cadencia por producto y los detalles de ticks de Deriv
+están en `docs/deriv/03_mercado/01_catalogo_velas_ticks.es.md`.
 
 ## Sin sondeo
 

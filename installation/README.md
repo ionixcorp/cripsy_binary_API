@@ -53,10 +53,10 @@ Solo informa del estado y no instala ni escribe nada.
 ..\scripts\build_docs.ps1 -Lang es
 
 # scripts listos para usar (leen .env y operan en demo)
-.\..\scripts\conectar.ps1
-.\..\scripts\balance.ps1
-.\..\scripts\verificar_iqoption.ps1 -SoloLectura
-.\..\scripts\verificar_deriv.ps1 -SoloLectura
+.\..\scripts\iqoption\conectar.ps1
+.\..\scripts\iqoption\balance.ps1
+.\..\scripts\iqoption\verificar_iqoption.ps1 -SoloLectura
+.\..\scripts\deriv\verificar_deriv.ps1 -SoloLectura
 .\..\scripts\verificar_todo.ps1 -SoloLectura   # ambos brókers
 ```
 

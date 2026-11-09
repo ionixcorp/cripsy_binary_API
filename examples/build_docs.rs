@@ -385,7 +385,11 @@ fn main() {
             .unwrap_or(ruta)
             .to_string_lossy()
             .replace('\\', "/");
-        let grupo = rel.split('/').next().unwrap_or("general").to_string();
+        let grupo = if rel.contains('/') {
+            rel.split('/').next().unwrap_or("general").to_string()
+        } else {
+            "general".to_string()
+        };
         let nombre = rel
             .rsplit('/')
             .next()
@@ -428,7 +432,9 @@ fn main() {
     };
 
     let mut nav_html = String::new();
-    for (grupo, items) in &nav_grupos {
+    let mut grupos: Vec<_> = nav_grupos.iter().collect();
+    grupos.sort_by_key(|(grupo, _)| orden_grupo(grupo));
+    for (grupo, items) in grupos {
         nav_html.push_str(&format!(
             "<div class=\"nav-grupo\"><div class=\"nav-titulo\">{}</div>",
             esc(&nombre_grupo(grupo))
@@ -478,7 +484,7 @@ fn main() {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>cripsy_binary_API — Documentación</title>
-<meta name="description" content="Documentación de cripsy_binary_API: cliente Rust para la API de IQ Option.">
+<meta name="description" content="Documentación de cripsy_binary_API: cliente Rust multibróker para IQ Option y Deriv.">
 <style>
 :root {{ --bg:#0b0e14; --panel:#11151f; --panel2:#151b28; --borde:#1f2736; --texto:#dde3ee; --suave:#8d97a8; --acento:#6aa8ff; --codigo:#0a0d13; }}
 *, *::before, *::after {{ box-sizing:border-box; }}
@@ -675,19 +681,27 @@ fn recopilar(dir: &Path, sufijo: &str, salida: &mut Vec<PathBuf>) {
 }
 
 fn nombre_grupo(g: &str) -> String {
-    let sin_num = g.split_once('_').map(|(_, b)| b).unwrap_or(g);
-    let titulo: String = sin_num
-        .split('_')
-        .map(|p| {
-            let mut c = p.chars();
-            match c.next() {
-                Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
-                None => String::new(),
-            }
-        })
-        .collect::<Vec<_>>()
-        .join(" ");
-    titulo
+    match g {
+        "general" => "General".to_string(),
+        "iqoption" => "IQ Option".to_string(),
+        "deriv" => "Deriv".to_string(),
+        "python" => "Python".to_string(),
+        "herramientas" => "Herramientas".to_string(),
+        "releases" => "Notas de versión".to_string(),
+        otro => otro.to_string(),
+    }
+}
+
+fn orden_grupo(g: &str) -> usize {
+    match g {
+        "general" => 0,
+        "iqoption" => 1,
+        "deriv" => 2,
+        "python" => 3,
+        "herramientas" => 4,
+        "releases" => 5,
+        _ => 99,
+    }
 }
 
 fn serde_json_string(s: &str) -> String {

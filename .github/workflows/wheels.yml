@@ -10,12 +10,24 @@ permissions:
 
 jobs:
   wheels:
-    name: Wheel (${{ matrix.os }})
+    name: Wheel (${{ matrix.plataforma }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            plataforma: linux-x64
+          - os: ubuntu-24.04-arm
+            plataforma: linux-arm64
+          - os: windows-latest
+            plataforma: windows-x64
+          - os: windows-11-arm
+            plataforma: windows-arm64
+          - os: macos-15-intel
+            plataforma: macos-intel
+          - os: macos-latest
+            plataforma: macos-arm64
     steps:
       - uses: actions/checkout@v4
       - uses: PyO3/maturin-action@v1
@@ -24,7 +36,7 @@ jobs:
           manylinux: auto
       - uses: actions/upload-artifact@v4
         with:
-          name: wheels-${{ matrix.os }}
+          name: wheels-${{ matrix.plataforma }}
           path: dist/*.whl
 
   sdist:
