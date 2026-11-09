@@ -5,12 +5,12 @@
 //! generan un `request_id`, lo registran en el router, envían por la cola y
 //! esperan la respuesta con timeout. Cero polling, cero estado global.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use serde_json::{json, Value};
-use tokio::sync::{broadcast, mpsc, RwLock};
+use tokio::sync::{broadcast, mpsc, Notify, RwLock};
 
 use crate::broker::config::{BrokerParams, IqOptionConfig};
 use crate::broker::error::BrokerError;
@@ -95,6 +95,10 @@ pub struct IqOptionBroker {
     pub(crate) suscripciones: Arc<RwLock<Vec<Suscripcion>>>,
     /// `true` mientras la tarea del socket tiene un WebSocket operativo.
     pub(crate) vivo: Arc<AtomicBool>,
+    /// Señal de caída simulada, solo para pruebas de resiliencia.
+    pub(crate) cortar: Arc<Notify>,
+    /// Órdenes abiertas sin cierre observado (base de la reconciliación).
+    pub(crate) abiertas: Arc<RwLock<HashSet<OrderId>>>,
     pub(crate) router: Arc<RequestRouter>,
     pub(crate) estado: Arc<RwLock<Estado>>,
     pub(crate) catalogo: Arc<RwLock<Vec<Asset>>>,
@@ -155,12 +159,16 @@ impl IqOptionBroker {
             Arc::new(RwLock::new(HashMap::new()));
         let suscripciones: Arc<RwLock<Vec<Suscripcion>>> = Arc::new(RwLock::new(Vec::new()));
         let vivo = Arc::new(AtomicBool::new(true));
+        let cortar = Arc::new(Notify::new());
+        let abiertas: Arc<RwLock<HashSet<OrderId>>> = Arc::new(RwLock::new(HashSet::new()));
 
         let broker = Self {
             config,
             salida: Some(tx_salida),
             suscripciones: suscripciones.clone(),
             vivo: vivo.clone(),
+            cortar: cortar.clone(),
+            abiertas: abiertas.clone(),
             router: router.clone(),
             estado: estado.clone(),
             catalogo: catalogo.clone(),
@@ -179,6 +187,8 @@ impl IqOptionBroker {
                 config: broker.config.clone(),
                 suscripciones: suscripciones.clone(),
                 vivo: vivo.clone(),
+                cortar: cortar.clone(),
+                abiertas: abiertas.clone(),
                 router: router.clone(),
                 estado: estado.clone(),
                 catalogo: catalogo.clone(),
@@ -344,6 +354,17 @@ impl IqOptionBroker {
     pub(crate) fn cerrar_salida(&mut self) {
         self.salida = None;
     }
+
+    /// Fuerza la caída del WebSocket para ejercitar el camino de reconexión.
+    ///
+    /// Herramienta de pruebas de resiliencia: cierra el socket como si el
+    /// bróker lo hubiera cortado. La sesión debe reconectar, restaurar el
+    /// estado, reproducir suscripciones y emitir `Event::Reconnected`.
+    /// No debe usarse en operación normal.
+    #[doc(hidden)]
+    pub async fn simular_caida_de_conexion(&self) {
+        self.cortar.notify_one();
+    }
 }
 
 /// Extrae el `ssid` de la cookie o del cuerpo del login.
@@ -366,6 +387,8 @@ pub(crate) struct Ctx {
     pub(crate) config: IqOptionConfig,
     pub(crate) suscripciones: Arc<RwLock<Vec<Suscripcion>>>,
     pub(crate) vivo: Arc<AtomicBool>,
+    pub(crate) cortar: Arc<Notify>,
+    pub(crate) abiertas: Arc<RwLock<HashSet<OrderId>>>,
     pub(crate) router: Arc<RequestRouter>,
     pub(crate) estado: Arc<RwLock<Estado>>,
     pub(crate) catalogo: Arc<RwLock<Vec<Asset>>>,
@@ -465,6 +488,13 @@ async fn bucle_socket(
                     }
                 }
             }
+
+            _ = ctx.cortar.notified() => {
+                // Solo pruebas de resiliencia: se comporta como un corte externo.
+                tracing::warn!("caída simulada: cerrando el socket");
+                let _ = ws.cerrar().await;
+                return "caída simulada";
+            }
         }
     }
 }
@@ -555,7 +585,94 @@ async fn abrir_y_restaurar(ctx: &Ctx, ssid: &str) -> Result<WsClient, BrokerErro
         let rid = ctx.router.next_id("iq");
         ws.enviar(&sub.name, &sub.msg, &rid).await?;
     }
+
+    // Reconciliación: un cierre ocurrido sin conexión no llegó por evento. El
+    // historial de posiciones es la única fuente disponible para recuperarlo.
+    if let Ok(historial) = pedir_historial(&mut ws, ctx, plazo).await {
+        let pendientes = ctx.abiertas.read().await.clone();
+        for (id, result) in reconciliar(&pendientes, &historial) {
+            let nuevo = {
+                let mut cache = ctx.resultados.write().await;
+                if cache.contains_key(&id) {
+                    false
+                } else {
+                    cache.insert(id.clone(), result);
+                    true
+                }
+            };
+            ctx.abiertas.write().await.remove(&id);
+            if nuevo {
+                let _ = ctx.eventos.send(Event::OrderClosed { id, result });
+            }
+        }
+    } else {
+        tracing::warn!("sin historial de posiciones: no se pudo reconciliar");
+    }
     Ok(ws)
+}
+
+/// Historial de posiciones cerradas del balance activo.
+async fn pedir_historial(
+    ws: &mut WsClient,
+    ctx: &Ctx,
+    plazo: std::time::Duration,
+) -> Result<PositionHistory, BrokerError> {
+    let balance_id = ctx
+        .estado
+        .read()
+        .await
+        .session
+        .as_ref()
+        .and_then(|s| s.balance_id);
+    let respuesta = solicitar_directo(
+        ws,
+        ctx,
+        msg::SEND_MESSAGE,
+        &json!({
+            "name": msg::PORTFOLIO_GET_HISTORY,
+            "body": {
+                "instrument_types": ["turbo-option", "binary-option", "digital-option"],
+                "limit": 100,
+                "offset": 0,
+                "start": 0,
+                "end": 0,
+                "user_balance_id": balance_id
+            }
+        }),
+        plazo,
+    )
+    .await?;
+    mapper::historial_desde_positions(&respuesta, 0)
+        .ok_or_else(|| BrokerError::Rejected("historial sin positions".into()))
+}
+
+/// Traduce una posición cerrada al resultado contable del dominio.
+fn resultado_desde_posicion(p: &Position) -> Option<OperationResult> {
+    let pnl = p.pnl?;
+    Some(if pnl > 0.0 {
+        OperationResult::Win(pnl)
+    } else if pnl < 0.0 {
+        OperationResult::Loss(pnl.abs())
+    } else {
+        OperationResult::Equal(p.amount)
+    })
+}
+
+/// Cierres que el historial conoce y la sesión aún tiene como abiertos.
+///
+/// Solo se aceptan identificadores pendientes: un cierre ajeno al consumidor
+/// no debe aparecer en su caché de resultados.
+fn reconciliar(
+    pendientes: &HashSet<OrderId>,
+    historial: &PositionHistory,
+) -> Vec<(OrderId, OperationResult)> {
+    let mut vistos = HashSet::new();
+    historial
+        .positions
+        .iter()
+        .filter(|p| pendientes.contains(&p.id) && vistos.insert(p.id.clone()))
+        .filter_map(|p| resultado_desde_posicion(p).map(|r| (p.id.clone(), r)))
+        .collect()
 }
 
 /// Petición correlacionada sobre un socket que aún no tiene tarea de despacho.
@@ -610,6 +727,8 @@ async fn enrutar_evento(frame: &crate::transport::websocket::WsFrame, ctx: &Ctx)
         config: _,
         suscripciones: _,
         vivo: _,
+        cortar: _,
+        abiertas,
         router: _,
         estado,
         catalogo,
@@ -757,6 +876,7 @@ async fn enrutar_evento(frame: &crate::transport::websocket::WsFrame, ctx: &Ctx)
                 let mut cache = resultados.write().await;
                 if !cache.contains_key(&id) {
                     cache.insert(id.clone(), result);
+                    abiertas.write().await.remove(&id);
                     drop(cache);
                     let _ = eventos.send(Event::OrderClosed { id, result });
                 }
@@ -770,6 +890,7 @@ async fn enrutar_evento(frame: &crate::transport::websocket::WsFrame, ctx: &Ctx)
                     let mut cache = resultados.write().await;
                     if !cache.contains_key(&id) {
                         cache.insert(id.clone(), result);
+                        abiertas.write().await.remove(&id);
                         drop(cache);
                         let _ = eventos.send(Event::OrderClosed { id, result });
                     }
@@ -846,6 +967,8 @@ mod tests {
                 config: IqOptionConfig::default(),
                 suscripciones: Arc::new(RwLock::new(Vec::new())),
                 vivo: Arc::new(AtomicBool::new(true)),
+                cortar: Arc::new(Notify::new()),
+                abiertas: Arc::new(RwLock::new(HashSet::new())),
                 router: Arc::new(RequestRouter::new()),
                 estado: Arc::new(RwLock::new(Estado::default())),
                 catalogo: Arc::new(RwLock::new(Vec::new())),
@@ -938,6 +1061,50 @@ mod tests {
         assert_eq!(siguiente_espera(4_000, 8_000), 8_000);
         assert_eq!(siguiente_espera(8_000, 8_000), 8_000);
         assert_eq!(siguiente_espera(8_000, 0), 1);
+    }
+
+    /// La reconciliación solo completa órdenes propias sin cierre observado.
+    #[test]
+    fn reconciliacion_solo_rellena_ordenes_pendientes() {
+        let posicion = |id: &str, pnl: Option<f64>| Position {
+            id: id.into(),
+            instrument_type: "turbo-option".into(),
+            symbol: "EURUSD".into(),
+            side: Side::Buy,
+            amount: 1.0,
+            open_price: Some(1.1),
+            pnl,
+            invested: Some(1.0),
+            open_at: 1,
+            close_at: Some(2),
+            leverage: None,
+        };
+        let historial = PositionHistory {
+            positions: vec![
+                posicion("111", Some(0.83)),
+                posicion("222", Some(-1.0)),
+                posicion("333", Some(0.0)),
+                posicion("999", Some(5.0)),
+                posicion("111", Some(0.83)),
+            ],
+            offset: 0,
+            total: Some(5),
+        };
+        let pendientes: HashSet<OrderId> = ["111", "222", "333"]
+            .into_iter()
+            .map(str::to_string)
+            .collect();
+
+        let mut filas = reconciliar(&pendientes, &historial);
+        filas.sort_by(|a, b| a.0.cmp(&b.0));
+        assert_eq!(
+            filas,
+            vec![
+                ("111".to_string(), OperationResult::Win(0.83)),
+                ("222".to_string(), OperationResult::Loss(1.0)),
+                ("333".to_string(), OperationResult::Equal(1.0)),
+            ]
+        );
     }
 
     /// Un fallo de credenciales es terminal; uno de red se reintenta.

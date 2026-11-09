@@ -57,14 +57,31 @@ let cfg = IqOptionConfig {
 };
 ```
 
+## Reconciliación de cierres
+
+Una orden se abre y se registra como pendiente. Si su cierre ocurre durante la
+caída, el evento nunca llega; al reconectar la sesión consulta el historial de
+posiciones del balance activo y recupera esos cierres:
+
+- Solo se completan identificadores que esta sesión abrió y siguen pendientes.
+  Un cierre ajeno no aparece en la caché del consumidor.
+- El resultado se publica como `Event::OrderClosed`, igual que un cierre
+  normal, así que el consumidor no necesita una ruta distinta.
+- `Win` lleva la ganancia neta, `Loss` el importe perdido y `Equal` el importe
+  devuelto, calculados desde el PnL de la posición.
+
+Si el historial no responde, la reconexión continúa y se registra el aviso en
+`tracing`; las órdenes afectadas quedan como estaban.
+
 ## Qué no resuelve
 
-- **Órdenes en vuelo**: se descartan con error y no se reenvían.
+- **Órdenes en vuelo**: se descartan con error y no se reenvían. Una orden
+  aceptada por el bróker sí se reconcilia al volver.
 - **Huecos de datos**: las velas y ticks ocurridos durante la caída no llegan
   por el stream; se recuperan con `get_candles` o la descarga paginada.
-- **Cierres perdidos**: si la caída cubre el cierre de una orden, el resultado
-  puede no llegar por evento; el historial de posiciones
-  (`get_position_history`) es la fuente para reconciliar.
+- **Cierres fuera de la ventana del historial**: la reconciliación consulta las
+  100 posiciones más recientes; un cierre más antiguo exige consultar el
+  historial con paginación.
 
 ## Observabilidad
 
@@ -72,3 +89,10 @@ Los avisos de reconexión se registran con `tracing` (`warn` al perder el
 socket, `info` al restablecerlo, `error` si se abandona). El consumidor que
 quiera métricas propias puede contar `Disconnected` frente a `Reconnected` y
 usar `downtime_ms` para medir la indisponibilidad real.
+
+## Estado verificado
+
+La suite viva fuerza la caída del socket y comprueba el ciclo completo:
+`Disconnected`, reconexión, operativa posterior y replay de una suscripción.
+Última ejecución: 1 intento de reconexión, 5.710 ms sin conexión y vela
+recibida tras volver; 34 comprobaciones, 0 fallos.

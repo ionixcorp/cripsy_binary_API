@@ -19,8 +19,15 @@ y versionado semántico.
   haya socket, en vez de encolarse para ejecutarse con datos obsoletos.
 - `TransportConfig::cola_salida` (256 por defecto): capacidad de la cola de
   salida del socket.
+- Reconciliación al reconectar: las órdenes abiertas cuyo cierre ocurrió sin
+  conexión se recuperan del historial de posiciones y se publican como
+  `Event::OrderClosed`, sin reenviar nada al bróker.
+- `IqOptionBroker::simular_caida_de_conexion` (marcado `#[doc(hidden)]`) para
+  ejercitar la recuperación en pruebas de resiliencia.
+- La verificación viva incluye una caída forzada del socket con comprobación de
+  `Disconnected`, `Reconnected`, operativa posterior y replay de suscripciones.
 - `docs/09_reconexion/01_reconexion.es.md` con el diseño y los límites del
-  supervisor de sesión.
+  supervisor de sesión, más la sección de continuidad del README.
 - `Broker::buy_blitz` con `BuyBlitzRequest`: la duración viaja en segundos y el
   payout se puede indicar de forma explícita. `buy_binary` deja de transportar
   segundos en `expiration_minutes` y delega el blitz en la nueva petición.

@@ -544,6 +544,8 @@ impl Broker for IqOptionBroker {
                                 .to_string(),
                         )
                     })?;
+                // Base de la reconciliación: hasta que llegue un cierre.
+                self.abiertas.write().await.insert(id.to_string());
                 Ok(id.to_string())
             }
             Err(e) => Err(e),
@@ -640,6 +642,7 @@ impl Broker for IqOptionBroker {
                         .to_string(),
                 )
             })?;
+        self.abiertas.write().await.insert(id.to_string());
         Ok(id.to_string())
     }
 
@@ -749,6 +752,7 @@ impl Broker for IqOptionBroker {
                     .write()
                     .await
                     .insert(instrument_id.clone(), id.to_string());
+                self.abiertas.write().await.insert(id.to_string());
                 Ok(id.to_string())
             }
             Err(e) => Err(e),

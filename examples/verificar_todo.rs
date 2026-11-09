@@ -311,6 +311,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Err(e) => v.fallo("ticks de precio nativos", &e.to_string()),
     }
 
+    println!();
+    verificar_reconexion(&broker, &simbolo, &mut v).await;
+
     if solo_lectura {
         println!("\n  (órdenes omitidas por --solo-lectura)");
     } else {
@@ -331,6 +334,96 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(())
     } else {
         std::process::exit(1);
+    }
+}
+
+/// Fuerza la caída del socket y comprueba que la sesión se recupera sola.
+async fn verificar_reconexion(broker: &IqOptionBroker, simbolo: &str, v: &mut Verificador) {
+    let mut eventos = match broker.events().await {
+        Ok(e) => e,
+        Err(e) => {
+            v.fallo("reconexión (eventos)", &e.to_string());
+            return;
+        }
+    };
+    let mut velas = match broker
+        .subscribe_candles(CandleSubscribe {
+            symbol: simbolo.to_string(),
+            interval: 60,
+        })
+        .await
+    {
+        Ok(s) => s,
+        Err(e) => {
+            v.fallo("reconexión (suscripción)", &e.to_string());
+            return;
+        }
+    };
+
+    broker.simular_caida_de_conexion().await;
+
+    let limite = tokio::time::Instant::now() + Duration::from_secs(150);
+    let mut motivo: Option<String> = None;
+    let mut reconectado: Option<(u32, u64)> = None;
+    while tokio::time::Instant::now() < limite {
+        match tokio::time::timeout(Duration::from_secs(10), eventos.next()).await {
+            Ok(Some(Event::Disconnected { motivo: m })) => {
+                motivo = Some(m);
+                v.ok("caída detectada", "evento Disconnected recibido");
+            }
+            Ok(Some(Event::Reconnected {
+                intentos,
+                downtime_ms,
+            })) => {
+                reconectado = Some((intentos, downtime_ms));
+                break;
+            }
+            Ok(Some(_)) => continue,
+            Ok(None) => break,
+            Err(_) => continue,
+        }
+    }
+
+    match reconectado {
+        Some((intentos, downtime_ms)) => v.ok(
+            "reconexión automática",
+            format!("{intentos} intento(s), {downtime_ms} ms sin conexión"),
+        ),
+        None => {
+            let detalle = match &motivo {
+                Some(m) => format!("no volvió en 150 s (motivo: {m})"),
+                None => "no se detectó la caída".to_string(),
+            };
+            v.fallo("reconexión automática", &detalle);
+            return;
+        }
+    }
+
+    if broker.is_connected().await {
+        v.ok("sesión restablecida", "is_connected() = true");
+    } else {
+        v.fallo(
+            "sesión restablecida",
+            "is_connected() = false tras reconectar",
+        );
+    }
+
+    match broker.get_balance().await {
+        Ok(b) => v.ok(
+            "operativa tras reconectar",
+            format!("{} {}", b.amount, b.currency),
+        ),
+        Err(e) => v.fallo("operativa tras reconectar", &e.to_string()),
+    }
+
+    match tokio::time::timeout(Duration::from_secs(120), velas.next()).await {
+        Ok(Some(Ok(vela))) => v.ok(
+            "replay de suscripciones",
+            format!("vela recibida tras reconectar: {}", vela.close),
+        ),
+        Ok(Some(Err(e))) => v.fallo("replay de suscripciones", &e.to_string()),
+        Ok(None) => v.fallo("replay de suscripciones", "el stream cerró"),
+        Err(_) => v.fallo("replay de suscripciones", "sin vela en 120 s"),
     }
 }
 

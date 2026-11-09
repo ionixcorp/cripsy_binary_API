@@ -78,6 +78,7 @@ La librería incluye las siguientes funcionalidades:
 | 🌐 | Datos de plataforma | Perfil fundamental del activo, comisiones en vivo y operaciones de terceros |
 | 🧠 | Señales del bróker | Humor de traders, activos populares e indicadores publicados por el bróker |
 | 🔁 | Modos de consumo | `async`/`await` o `SyncBroker` bloqueante |
+| 🔌 | Continuidad | Reconexión automática con reautenticación, replay de suscripciones y aviso por eventos |
 | 🧩 | Multibróker | El trait `Broker` y un registro de adaptadores separan el dominio del transporte |
 
 ### Datos disponibles a través de la API
@@ -86,6 +87,35 @@ Además de las operaciones, la interfaz permite leer metadatos que el bróker
 publica en su inicializador: ventana de venta anticipada, margen previo al
 cierre, proveedor del precio, decimales, rollovers de blitz, comisiones y
 operaciones de otros usuarios del instrumento.
+
+## 🔌 Continuidad de la conexión
+
+La librería mantiene la sesión por sí misma. **No hace falta que implementes un
+sistema anticaída encima**: si el WebSocket se interrumpe, la sesión
+reautentica, restaura perfil, balances y catálogo, reproduce todas las
+suscripciones y vuelve a despachar.
+
+Lo que el consumidor debe saber:
+
+- **Aviso por eventos**: `Event::Disconnected { motivo }` al perder la conexión
+y `Event::Reconnected { intentos, downtime_ms }` al recuperarla. No hay que
+reiniciar el bróker ni volver a suscribirse.
+- **Mientras no hay socket**: las llamadas devuelven `BrokerError::NotConnected`
+en lugar de encolarse. En opciones binarias, diferir una orden 30 segundos
+cambia el mercado y el resultado.
+- **Órdenes en vuelo**: se descartan con error y no se reenvían. Un cierre
+ocurrido durante la caída se recupera del historial de posiciones al
+reconectar.
+- **Streams**: los que ya tenías siguen siendo válidos y se reanudan solos.
+- **Cola acotada**: `TransportConfig::cola_salida` limita lo pendiente de
+enviar; si se llena, el productor espera en vez de crecer en memoria.
+- **Backoff**: `backoff_base_ms` … `backoff_max_ms`. Un rechazo de credenciales
+no se reintenta, para no bloquear la cuenta.
+
+Lo que **no** debe hacer el consumidor: reconectar por su cuenta, repetir el
+login ante un error de red, o resuscribir streams tras `Reconnected`. El diseño,
+los límites y la personalización están en
+[`docs/09_reconexion/01_reconexion.es.md`](docs/09_reconexion/01_reconexion.es.md).
 
 ## 📦 Instalación
 
@@ -126,8 +156,8 @@ Los scripts incluidos ejecutan comprobaciones reales contra el bróker. Leen
 `verificar_todo.ps1` informa `[OK]`, `[FALLO]` o `[AVISO]` por capacidad y
 termina con código 1 si algo falla. `-SoloLectura` omite el envío de órdenes.
 
-Resultado de la última ejecución (cuenta de práctica, 8 de noviembre de 2026):
-28 comprobaciones correctas, 0 fallos, 1 aviso — el bróker no publica
+Resultado de la última ejecución (cuenta de práctica, 9 de noviembre de 2026):
+34 comprobaciones correctas, 0 fallos, 1 aviso — el bróker no publica
 indicadores para el activo consultado.
 
 ## 🧭 Uso
@@ -154,6 +184,7 @@ cargo run --example verificar_todo       # verificación integral
 | [Digital](docs/04_digital/01_digital.es.md) · [Binary](docs/05_binary/01_binary.es.md) · [Blitz](docs/06_blitz/01_blitz.es.md) | Tipos de orden |
 | [Herramientas](docs/07_herramientas/01_herramientas.es.md) | Instalación, scripts y adaptadores |
 | [Indicadores](docs/08_indicadores/01_indicadores.es.md) | Canal de indicadores del bróker |
+| [Reconexión](docs/09_reconexion/01_reconexion.es.md) | Continuidad: qué resuelve la API y qué debe hacer el consumidor |
 
 Para generar la documentación navegable en local:
 
@@ -191,7 +222,7 @@ Las propuestas y discusiones se atienden en los issues del repositorio.
 ## 🧪 Calidad
 
 ```powershell
-.\scripts\verify.ps1   # fmt + clippy -D warnings + 64 tests + build blocking + docs
+.\scripts\verify.ps1   # fmt + clippy -D warnings + 68 tests + build blocking + docs
 ```
 
 La compuerta es la misma que se ejecuta en Windows y en Linux. Los tests no
