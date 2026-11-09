@@ -4,9 +4,8 @@ use async_trait::async_trait;
 use futures_core::Stream;
 
 use crate::domain::{
-    AccountType, Asset, AssetProfile, Balance, BuyBinaryRequest, BuyBlitzRequest,
-    BuyDigitalRequest, Candle, CandleRequest, CandleSubscribe, Event, MarketStatus,
-    OperationResult, OptionType, OrderId, Payout, PositionHistory, TechnicalIndicators,
+    AccountType, Asset, Balance, BuyBinaryRequest, Candle, CandleRequest, CandleSubscribe, Event,
+    MarketStatus, OperationResult, OptionType, OrderId, Payout, PositionHistory,
 };
 
 use super::config::BrokerParams;
@@ -79,38 +78,12 @@ pub trait Broker: Send + Sync {
 
     // -------- Indicadores técnicos del bróker --------
 
-    /// Indicadores técnicos que el bróker envía para un activo (`trading-signals`).
-    /// No calcula nada: transporta lo que el bróker entregue; si no soporta el
-    /// activo devuelve `BrokerError::Rejected` con el mensaje del bróker.
-    async fn get_technical_indicators(
-        &self,
-        symbol: &str,
-    ) -> Result<TechnicalIndicators, BrokerError>;
-
-    /// Perfil fundamental del activo (nombre del bróker, ticker y variaciones
-    /// dtd/m1/y1/ytd) vía el endpoint GraphQL del bróker.
-    async fn get_asset_profile(&self, symbol: &str) -> Result<AssetProfile, BrokerError>;
-
-    /// Suscribe el stream de operaciones de terceros (`live-deal`) para un
-    /// activo. Los deals llegan por `Event::LiveDeal`.
-    async fn subscribe_live_deals(&self, symbol: &str) -> Result<(), BrokerError>;
-
-    /// Suscribe los cambios de comisión por tipo de instrumento. Llegan por
-    /// `Event::CommissionChanged`.
-    async fn subscribe_commission_changes(&self) -> Result<(), BrokerError>;
-
     // -------- Órdenes --------
 
     /// Compra clásica (turbo o binary según la duración).
     ///
     /// BLITZ tiene su propia petición: [`Broker::buy_blitz`].
     async fn buy_binary(&self, req: BuyBinaryRequest) -> Result<OrderId, BrokerError>;
-
-    /// Compra BLITZ: duración en segundos y payout explícito (protocolo v2).
-    async fn buy_blitz(&self, req: BuyBlitzRequest) -> Result<OrderId, BrokerError>;
-
-    /// Compra digital spot: el bróker elige el strike a precio actual.
-    async fn buy_digital_spot(&self, req: BuyDigitalRequest) -> Result<OrderId, BrokerError>;
 
     /// Venta anticipada (buyback) de una orden abierta. El bróker la admite
     /// dentro de la ventana `buyback_deadtime` del activo; si la orden ya no
@@ -126,10 +99,28 @@ pub trait Broker: Send + Sync {
         order_id: &OrderId,
     ) -> Result<OperationResult, BrokerError>;
 
+    /// Suscribe el stream **nativo** de ticks de un activo.
+    ///
+    /// Los ticks llegan por `Event::PriceTick`. Un adaptador sin stream nativo
+    /// hereda el rechazo explícito; no se simula con polling.
+    async fn subscribe_ticks(&self, symbol: &str) -> Result<(), BrokerError> {
+        let _ = symbol;
+        Err(capacidad_no_soportada(self.name(), "stream de ticks"))
+    }
+
     // -------- Eventos --------
 
     /// Stream de eventos (cierres, balances, payouts en vivo, velas suscritas).
     async fn events(&self) -> Result<EventStream, BrokerError>;
+}
+
+/// Rechazo uniforme de una capacidad que el bróker no ofrece.
+///
+/// Las capacidades exclusivas de IQ Option viven en el contrato por
+/// compatibilidad; un adaptador que no las ofrece no las implementa y hereda
+/// este rechazo explícito.
+fn capacidad_no_soportada(broker: &str, capacidad: &str) -> BrokerError {
+    BrokerError::Rejected(format!("{broker}: el bróker no ofrece {capacidad}"))
 }
 
 /// Marcador de compilación: el trait es `Send + Sync` por contrato.

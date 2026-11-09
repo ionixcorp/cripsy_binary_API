@@ -30,7 +30,7 @@ a.btn { text-decoration:none; padding:10px 18px; border-radius:9px; font-size:14
 <body>
 <div class="tarjeta">
   <h1>cripsy_binary_API</h1>
-  <div class="sub">API moderna (Rust) para brókers de opciones binarias</div>
+  <div class="sub">API moderna (Rust) multibróker: IQ Option y Deriv</div>
   <div id="estado" class="estado falta">Comprobando instalación…</div>
 
   <div id="panel-instalar" style="display:none">
@@ -46,6 +46,9 @@ a.btn { text-decoration:none; padding:10px 18px; border-radius:9px; font-size:14
       <li>Al terminar, recarga esta página: la documentación se abrirá
           automáticamente.</li>
     </ol>
+    <div class="nota"><strong>Nuevo en 0.3.0:</strong> adaptador <strong>Deriv</strong>
+    (modo público sin credenciales, ticks nativos, órdenes rise/fall y
+    reconciliación de cierres). IQ Option mantiene su fachada sincrónica.</div>
     <div class="botones">
       <a class="btn primario" href="installation/README.md">Ver guía de instalación</a>
       <a class="btn secundario" href="README.md">Guía de uso y reglas</a>

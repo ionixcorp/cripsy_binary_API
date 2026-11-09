@@ -34,7 +34,7 @@ El instalador, **pidiendo tu aprobación en cada paso**:
 ## Compuerta de calidad
 
 ```powershell
-.\scriptserify.ps1
+.\scripts\verify.ps1
 ```
 
 Ejecuta `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`,
@@ -59,27 +59,41 @@ funciona también sin servidor (`file://`, navegación por hash y sin `fetch`).
 
 Todas leen tus credenciales de `.env` y operan en cuenta **demo**:
 
-| Script | Qué hace |
-|---|---|
-| `scripts\conectar.ps1` | Sesión, balance, catálogo, velas y stream (solo lectura) |
-| `scripts\balance.ps1` | Balance, tipo de cuenta y `balance_id` |
-| `scripts\operar.ps1` | Orden de 1 USD en demo y cierre por evento (pide confirmación) |
-| `scripts\verificar_todo.ps1` | Valida **todas** las capacidades documentadas y reporta `[OK]`/`[FALLO]` |
+| Script | Bróker | Qué hace |
+|---|---|---|
+| `scripts\conectar.ps1` | IQ Option | Sesión, balance, catálogo, velas y stream (solo lectura) |
+| `scripts\balance.ps1` | IQ Option | Balance, tipo de cuenta y `balance_id` |
+| `scripts\operar.ps1` | IQ Option | Orden de 1 USD en demo y cierre por evento (pide confirmación) |
+| `scripts\verificar_iqoption.ps1` | IQ Option | Valida sus capacidades y reporta `[OK]`/`[FALLO]` |
+| `scripts\verificar_deriv.ps1` | Deriv | Público, ticks, densidad, órdenes y caídas en demo |
+| `scripts\verificar_todo.ps1` | Ambos | Ejecuta los dos verificadores en secuencia |
 
 ```powershell
-.\scripts\verificar_todo.ps1              # incluye órdenes demo
-.\scripts\verificar_todo.ps1 -SoloLectura # sin enviar órdenes
+.\scripts\verificar_iqoption.ps1            # IQ Option, incluye órdenes demo
+.\scripts\verificar_iqoption.ps1 -SoloLectura
+.\scripts\verificar_deriv.ps1               # Deriv, incluye órdenes y caídas
+.\scripts\verificar_deriv.ps1 -SoloLectura  # solo mercado y ticks
+.\scripts\verificar_todo.ps1                # ambos
 ```
+
+`verificar_deriv.ps1` usa el modo público si no hay token; para operar exige
+`DERIV_TOKEN` y `DERIV_APPID` en `.env`.
 
 ## Probar contra el bróker
 
 Los ejemplos leen las credenciales del entorno y operan en cuenta demo:
 
 ```powershell
-cargo run --example ejemplo_lectura     # sesión, catálogo, velas y stream
-cargo run --example ejemplo_sincrono    # el mismo consumo, bloqueante
-cargo run --example ejemplo_orden_demo  # compra demo y cierre por evento
-cargo run --example verificar_todo      # verificación integral
+cargo run --example ejemplo_lectura     # IQ Option: sesión, catálogo, velas y stream
+cargo run --example ejemplo_sincrono    # IQ Option: el mismo consumo, bloqueante
+cargo run --example ejemplo_orden_demo  # IQ Option: compra demo y cierre
+cargo run --example verificar_todo      # IQ Option: verificación integral
+
+cargo run --example deriv_conectar      # Deriv: público o cuenta demo
+cargo run --example deriv_ticks         # Deriv: ticks nativos y reconexión
+cargo run --example deriv_densidad      # Deriv: densidad por activo
+cargo run --example deriv_orden_demo    # Deriv: compra/venta demo
+cargo run --example deriv_reconciliacion # Deriv: cierre ocurrido sin red
 ```
 
 `ejemplo_orden_demo` mueve saldo de práctica: ejecútalo solo si eres el dueño de
@@ -89,9 +103,11 @@ la cuenta o tienes autorización explícita.
 
 1. Crear `src/broker/<nombre>/` con su `Config` (añadir la variante a
    `BrokerParams`).
-2. Implementar el trait `Broker` (async).
+2. Implementar el trait `Broker` (async) y `subscribe_ticks`.
 3. Escribir el mapper dominio ↔ protocolo del bróker.
-4. Registrar en `BrokerRegistry`.
+4. Si hay capacidades exclusivas, exponerlas en un trait propio (como
+   `IqOptionExtras`) en vez de ampliar `Broker`.
+5. Registrar en `BrokerRegistry` y añadir su verificador en `scripts/`.
 
 No se modifica ni el dominio ni el transporte: los brókers nuevos se añaden
 como adaptadores.

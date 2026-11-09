@@ -5,18 +5,22 @@ opciones binarias. Diseñada desde cero, con estas propiedades:
 
 - **Núcleo asíncrono**: el adaptador es `async`/`await` nativo.
 - **Fachada sincrónica**: `broker::sync::SyncBroker` permite consumir la misma
-  API con llamadas bloqueantes, sin tokio ni `await`.
+  API con llamadas bloqueantes, sin tokio ni `await` (solo IQ Option).
 - **Sin estado global estático y sin polling**: cada petición crea un canal y la
   respuesta se correlaciona por `request_id`; los resultados de las órdenes
   llegan por eventos.
 - **Multibróker**: una interfaz común (`Broker`) con adaptadores por bróker;
-  el primero es IQ Option.
-- **Streams nativos de alta densidad**: ~3 ticks de precio por segundo por
-  activo en la medición documentada; hasta 75 activos por sesión sin rechazos.
+  IQ Option y Deriv integrados, con las capacidades exclusivas de IQ Option en
+  `IqOptionExtras`.
+- **Streams nativos**: IQ Option mide ~3 ticks/s por activo en OTC y admite
+  75 activos por sesión sin rechazos; Deriv entrega la cadencia del producto
+  (0,5–1 tick/s en la medición pública). Sin polling en ninguno de los dos.
 - **Tipado de extremo a extremo**: nada de diccionarios crudos en la frontera
   pública.
 
 ## Estado actual
+
+### IQ Option
 
 | Componente | Estado |
 |---|---|
@@ -34,6 +38,18 @@ opciones binarias. Diseñada desde cero, con estas propiedades:
 | Resultados por evento y caché | Listo, verificado en cuenta demo |
 | Fachada sincrónica (`SyncBroker`) | Lista, verificada contra el bróker |
 | Indicadores técnicos del bróker | Canal implementado; el bróker rechaza hoy todos los activos |
+
+### Deriv
+
+| Componente | Estado |
+|---|---|
+| Modo público (sin credenciales) | Listo, verificado: catálogo, velas, payout y ticks |
+| Sesión autenticada (OTP + App ID) | Lista, verificada en cuenta demo |
+| Compra y venta rise/fall | Listas, verificadas en cuenta demo |
+| Cierre por evento e historial | Listos, verificados (`profit_table` paginado) |
+| Reconexión con OTP nuevo | Lista, verificada (2 396 ms, replay de suscripciones) |
+| Reconciliación de cierres | Lista, verificada con 72 s sin red y un solo evento |
+| Blitz, digital, indicadores, live-deals | No soportado; rechazo explícito |
 
 ## Qué no hace
 
@@ -58,16 +74,19 @@ Todas las llamadas del trait `Broker` son `async` y devuelven
 | 07 · Herramientas | Instalación, verificación y cómo añadir otro bróker |
 | 08 · Indicadores | Indicadores del bróker: estado y alternativas |
 | 09 · Reconexión | Supervisión de sesión, replay de suscripciones y límites |
+| 10 · Deriv | Adaptador Deriv: alcance, credenciales, densidad y límites |
+| 11 · Python | Binding PyO3/maturin: instalación, superficie y límites |
 
 ## Requisitos
 
 - Rust 1.86 o superior (`rustup`).
-- Credenciales del bróker (se recomienda cuenta demo para empezar).
+- Credenciales del bróker (cuenta demo recomendada; en Deriv el modo público
+  no necesita ninguna).
 - Windows, Linux o macOS.
 
 ## Limitaciones conocidas
 
-- **Reconexión automática (0.2.0)**: si el WebSocket cae, la sesión
+- **Reconexión automática (0.2.0, ampliada a Deriv en 0.3.0)**: si el WebSocket cae, la sesión
   reautentica, restaura perfil, catálogo y suscripciones, y lo informa con
   `Event::Disconnected` y `Event::Reconnected { intentos, downtime_ms }`.
   Mientras no hay socket, las llamadas devuelven `BrokerError::NotConnected`.
@@ -88,3 +107,8 @@ Todas las llamadas del trait `Broker` son `async` y devuelven
   el stream entrega `Event::EventsLost { count }` y continúa.
 - **Indicadores técnicos**: dependen de lo que el bróker publique para cada
   activo; hoy los rechaza para los activos probados.
+- **Deriv sin fachada sincrónica**: `SyncBroker` es exclusivo de IQ Option.
+- **Deriv solo rise/fall**: blitz, digital, indicadores y live-deals se rechazan
+  de forma explícita en lugar de simularse.
+- **Identificadores de Deriv**: las cuentas son cadenas; `balance_id` y
+  `Asset.opcode` usan un sustituto determinista documentado.

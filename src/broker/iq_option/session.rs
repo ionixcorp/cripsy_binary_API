@@ -117,6 +117,11 @@ impl IqOptionBroker {
     pub async fn nuevo(params: BrokerParams) -> Result<Self, BrokerError> {
         let (config, cfg_trafico) = match params {
             BrokerParams::IqOption(c) => (c.clone(), c.transport.clone()),
+            BrokerParams::Deriv(_) => {
+                return Err(BrokerError::Internal(
+                    "iq_option: se esperaba BrokerParams::IqOption".into(),
+                ))
+            }
         };
 
         // ---------- login HTTP ----------

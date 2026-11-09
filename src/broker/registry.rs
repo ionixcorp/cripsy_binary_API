@@ -13,7 +13,7 @@ pub struct BrokerRegistry;
 impl BrokerRegistry {
     /// Adaptadores disponibles.
     pub fn list() -> Vec<&'static str> {
-        vec!["iq_option"]
+        vec!["iq_option", "deriv"]
     }
 
     /// Existe el adaptador con este nombre.
@@ -29,6 +29,10 @@ impl BrokerRegistry {
                 let broker = <crate::broker::IqOptionBroker as Broker>::connect(params).await?;
                 Ok(Box::new(broker))
             }
+            BrokerParams::Deriv(_) => {
+                let broker = <crate::broker::DerivBroker as Broker>::connect(params).await?;
+                Ok(Box::new(broker))
+            }
         }
     }
 }
@@ -39,8 +43,9 @@ mod tests {
 
     #[test]
     fn registro_incluye_iq_option() {
-        assert_eq!(BrokerRegistry::list(), vec!["iq_option"]);
+        assert_eq!(BrokerRegistry::list(), vec!["iq_option", "deriv"]);
         assert!(BrokerRegistry::contains("iq_option"));
+        assert!(BrokerRegistry::contains("deriv"));
         assert!(!BrokerRegistry::contains("inexistente"));
     }
 }

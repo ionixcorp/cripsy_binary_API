@@ -1,0 +1,32 @@
+[build-system]
+requires = ["maturin>=1.14,<2"]
+build-backend = "maturin"
+
+[project]
+name = "cripsy-binary-api"
+version = "0.3.0"
+description = "Bindings Python para cripsy-binary-api: IQ Option y Deriv (opciones binarias)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [{ name = "ionixcorp" }]
+keywords = ["trading", "binary-options", "iqoption", "deriv", "broker"]
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Office/Business :: Financial :: Investment",
+]
+
+[project.urls]
+Homepage = "https://ionixcorp.github.io/cripsy_binary_API/"
+Repository = "https://github.com/ionixcorp/cripsy_binary_API"
+Documentation = "https://ionixcorp.github.io/cripsy_binary_API/"
+
+[tool.maturin]
+module-name = "cripsy_binary_api"

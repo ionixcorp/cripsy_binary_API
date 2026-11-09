@@ -9,7 +9,7 @@ paso que modifique tu sistema se ejecuta sin que lo confirmes.
 |---|---|---|
 | Rust (rustup + cargo) | Compilar la librería | 1.86 |
 | git | Control de versiones | cualquiera |
-| Credenciales del bróker | Probar la conexión | cuenta demo recomendada |
+| Credenciales del bróker | Probar la conexión | demo recomendada; Deriv funciona sin ellas |
 
 ## Instalación rápida
 
@@ -55,7 +55,9 @@ Solo informa del estado y no instala ni escribe nada.
 # scripts listos para usar (leen .env y operan en demo)
 .\..\scripts\conectar.ps1
 .\..\scripts\balance.ps1
-.\..\scripts\verificar_todo.ps1 -SoloLectura
+.\..\scripts\verificar_iqoption.ps1 -SoloLectura
+.\..\scripts\verificar_deriv.ps1 -SoloLectura
+.\..\scripts\verificar_todo.ps1 -SoloLectura   # ambos brókers
 ```
 
 ## Ver la documentación navegable

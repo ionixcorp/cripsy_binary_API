@@ -16,3 +16,7 @@
 # Editores
 .idea
 .vscode
+python/dist/
+__pycache__/
+*.egg-info/
+python/target/

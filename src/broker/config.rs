@@ -86,4 +86,7 @@ impl Default for TransportConfig {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum BrokerParams {
     IqOption(IqOptionConfig),
+    /// Deriv (API moderna). Disponible con el núcleo async.
+    #[cfg(feature = "async")]
+    Deriv(crate::broker::deriv::DerivConfig),
 }

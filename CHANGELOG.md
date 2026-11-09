@@ -3,6 +3,45 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/)
 y versionado semántico.
 
+## [0.3.0] - 2026-11-09
+
+### Añadido
+
+- Adaptador **Deriv** (API moderna): conexión OTP por REST, gateway público sin
+  credenciales, catálogo, velas, cotización de payout, compra y venta rise/fall,
+  cierre por `proposal_open_contract`, historial paginado y reconexión con OTP
+  nuevo más replay de suscripciones.
+- `Broker::subscribe_ticks` con entrega por `Event::PriceTick`; Deriv implementa
+  el stream nativo y el resto de adaptadores hereda un rechazo explícito.
+- `DerivConfig` con `Debug` redactado y sin serializar el token; límites de tasa
+  por clase al 80 % de lo documentado por el bróker.
+- `BrokerError` conserva su taxonomía; las capacidades no soportadas responden
+  con el mensaje del bróker o con el rechazo por defecto.
+
+### Cambiado (incompatible)
+
+- Las capacidades exclusivas de IQ Option (`buy_blitz`, `buy_digital_spot`,
+  indicadores técnicos, perfil de activo, live deals y comisiones) salen de
+  `Broker` y pasan a `IqOptionExtras`. En `IqOptionBroker` siguen disponibles
+  como métodos inherentes, por lo que el código que usa el tipo concreto no
+  cambia; quien las invocaba sobre `Box<dyn Broker>` debe usar
+  `Box<dyn IqOptionExtras>` o el tipo concreto.
+- Migración: `use cripsy_binary_api::broker::IqOptionExtras;` solo si se consume
+  el trait de forma genérica.
+
+### Documentado
+
+- Alcance del producto: operación rise/fall, datos para cualquier activo y
+  densidad de ticks nativa como diferencial; expansión futura fuera de alcance.
+- `docs/10_deriv/01_deriv.es.md`: uso de Deriv, credenciales, límites y
+  diferencias con IQ Option.
+- Tabla de densidad medida por clase de activo y separación de los scripts de
+  verificación (`verificar_iqoption.ps1`, `verificar_deriv.ps1`,
+  `verificar_todo.ps1`).
+- Reconciliación de Deriv verificada en vivo: un cierre ocurrido durante 72 s
+  sin conexión se publica una sola vez, sin reenviar la orden.
+
+
 ## [0.2.1] - 2026-11-09
 
 ### Añadido

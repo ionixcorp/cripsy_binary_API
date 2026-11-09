@@ -39,7 +39,7 @@ atrasa más que el buffer, se descartan los eventos intermedios y el stream
 entrega `Event::EventsLost { count }` con la cuenta de los perdidos; el stream
 sigue abierto. Consume sin bloqueos largos entre lectura y lectura.
 
-Medido en vivo (2026-10-27, varios mercados OTC):
+Medido en vivo en IQ Option (2026-10-27, varios mercados OTC):
 
 | Activo (mercado) | Mensajes/s | Cambios de precio/s |
 |---|---|---|
@@ -49,8 +49,8 @@ Medido en vivo (2026-10-27, varios mercados OTC):
 
 Hallazgos clave:
 
-- La densidad (~3/s por activo) **no depende** de suscribir multi-tamaño o un
-  tamaño específico: da igual.
+- En IQ Option la densidad (~3/s por activo) **no depende** de suscribir
+  multi-tamaño o un tamaño específico: da igual.
 - **Caudal proporcional al número de activos**: con 20 activos suscritos se
   midieron 61 mensajes/s (3.07 por activo).
 - Escala verificada hasta **75 activos en una sola sesión**: 0 rechazos,
@@ -58,6 +58,25 @@ Hallazgos clave:
   cifra, así que no se documenta un techo.
 - La densidad exacta depende de la liquidez y el horario del activo; los
   ejemplos miden mercados OTC de fin de semana.
+
+## 3. Densidad medida en Deriv
+
+Gateway público, ventana de 8 s, 2026-11-09:
+
+| Activo | Clase | Ticks | Densidad | Hueco medio |
+|---|---|---|---|---|
+| `R_100` | índice sintético (2 s) | 4 | ≈0,5/s | 1 993 ms |
+| `1HZ100V` | índice sintético (1 s) | 8 | 1,0/s | 998 ms |
+| `1HZ10V` | índice sintético (1 s) | 8 | 1,0/s | 1 002 ms |
+| `frxAUDCAD` | forex | 8 | 1,0/s | 1 002 ms |
+| `cryBTCUSD` | cripto | 8 | 1,0/s | 998 ms |
+| `frxXAGUSD` | materia prima | 6–8 | 0,75–1,0/s | 1 000–1 183 ms |
+
+La cadencia la fija el producto: los índices de 2 s entregan un tick cada 2 s;
+forex y cripto llegan agregados a ~1/s por el gateway público. No es polling:
+se entrega el stream del bróker tal cual. La materia prima osciló entre 0,75 y
+1,0/s entre pasadas. Faltan mediciones con credenciales y en horario de mercado
+pleno; no se extrapolan.
 
 ## Sin sondeo
 

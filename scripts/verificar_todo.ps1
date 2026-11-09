@@ -1,24 +1,24 @@
 #!/usr/bin/env pwsh
-# Valida de punta a punta todas las capacidades documentadas de la API.
-# Sin -SoloLectura también envía órdenes de 1 USD en cuenta DEMO.
+# Compuerta viva completa: IQ Option y Deriv, en secuencia.
+# Sin -SoloLectura tambien envia ordenes de 1 USD en cuentas DEMO.
 param([switch]$SoloLectura)
 
 $ErrorActionPreference = "Stop"
-. (Join-Path $PSScriptRoot "_env.ps1")
 
-$argumentos = @()
-if ($SoloLectura) { $argumentos += "--solo-lectura" }
+Write-Host "===== IQ Option ====="
+& (Join-Path $PSScriptRoot "verificar_iqoption.ps1") -SoloLectura:$SoloLectura
+$iq = $LASTEXITCODE
 
 Write-Host ""
-Write-Host "Verificando la API contra el bróker (cuenta DEMO)..."
-cargo run --quiet --example verificar_todo -- @argumentos
-$codigo = $LASTEXITCODE
+Write-Host "===== Deriv ====="
+& (Join-Path $PSScriptRoot "verificar_deriv.ps1") -SoloLectura:$SoloLectura
+$deriv = $LASTEXITCODE
 
-if ($codigo -eq 0) {
+if ($iq -eq 0 -and $deriv -eq 0) {
     Write-Host ""
-    Write-Host "RESULTADO: la API funciona como esta documentada."
-} else {
-    Write-Host ""
-    Write-Host "RESULTADO: hay capacidades que no respondieron (ver [FALLO] arriba)."
+    Write-Host "RESULTADO: ambos brokers responden como esta documentado."
+    exit 0
 }
-exit $codigo
+Write-Host ""
+Write-Host "RESULTADO: hay fallos (IQ Option=$iq, Deriv=$deriv)."
+exit 1

@@ -329,125 +329,9 @@ impl Broker for IqOptionBroker {
         }
         Ok(historial)
     }
-    async fn get_technical_indicators(
-        &self,
-        symbol: &str,
-    ) -> Result<TechnicalIndicators, BrokerError> {
-        let asset_id = {
-            let catalogo = self.catalogo.read().await;
-            catalogo
-                .iter()
-                .find(|a| a.symbol == symbol)
-                .map(|a| a.opcode)
-                .ok_or_else(|| {
-                    BrokerError::Domain(crate::domain::error::DomainError::AssetNotFound(
-                        symbol.into(),
-                    ))
-                })?
-        };
-        // Mensaje: `trading-signals.get-technical-indicators` v1.0, body {id}.
-        // El `id` DEBE ser entero (string → INVALID_SCHEMA). Respuesta:
-        // `technical-indicators` con `msg.indicators`, o `msg.message` de error.
-        let respuesta = self
-            .solicitar(
-                msg::SEND_MESSAGE,
-                &json!({
-                    "name": msg::TECHNICAL_INDICATORS,
-                    "version": "1.0",
-                    "body": { "id": asset_id }
-                }),
-                msg::TECHNICAL_INDICATORS_RESPONSE,
-            )
-            .await?;
-        mapper::indicadores_desde_respuesta(&respuesta, symbol).map_err(BrokerError::Rejected)
-    }
 
     // -------- Órdenes --------
 
-    async fn get_asset_profile(&self, symbol: &str) -> Result<AssetProfile, BrokerError> {
-        let asset_id = {
-            let catalogo = self.catalogo.read().await;
-            catalogo
-                .iter()
-                .find(|a| a.symbol == symbol)
-                .map(|a| a.opcode)
-                .ok_or_else(|| {
-                    BrokerError::Domain(crate::domain::error::DomainError::AssetNotFound(
-                        symbol.into(),
-                    ))
-                })?
-        };
-        // GraphQL: el broker responde `financial-information` con data.active.
-        let respuesta = self
-            .solicitar(
-                msg::SEND_MESSAGE,
-                &json!({
-                    "name": msg::GET_FINANCIAL_INFORMATION,
-                    "version": "1.0",
-                    "body": {
-                        "query": mapper::QUERY_ASSET_PROFILE,
-                        "operationName": "GetAssetProfileInfo",
-                        "variables": { "activeId": asset_id }
-                    }
-                }),
-                msg::FINANCIAL_INFORMATION,
-            )
-            .await?;
-        mapper::perfil_desde_financial(symbol, &respuesta).map_err(BrokerError::Rejected)
-    }
-    async fn subscribe_live_deals(&self, symbol: &str) -> Result<(), BrokerError> {
-        let active_id = {
-            let catalogo = self.catalogo.read().await;
-            catalogo
-                .iter()
-                .find(|a| a.symbol == symbol)
-                .map(|a| a.opcode)
-                .ok_or_else(|| {
-                    BrokerError::Domain(crate::domain::error::DomainError::AssetNotFound(
-                        symbol.into(),
-                    ))
-                })?
-        };
-        // Ambos canales: el agregado y el específico de binarias.
-        self.suscribir(
-            &format!("live-deals:{symbol}"),
-            msg::SUBSCRIBE_MESSAGE,
-            &json!({
-                "name": msg::LIVE_DEAL,
-                "version": "1.0",
-                "params": { "routingFilters": { "instrument_active_id": active_id } }
-            }),
-        )
-        .await?;
-        self.suscribir(
-            &format!("live-deals-bin:{symbol}"),
-            msg::SUBSCRIBE_MESSAGE,
-            &json!({
-                "name": msg::LIVE_DEAL_BINARY,
-                "version": "1.0",
-                "params": { "routingFilters": { "active_id": active_id, "option_type": "binary-option" } }
-            }),
-        )
-        .await?;
-        Ok(())
-    }
-
-    async fn subscribe_commission_changes(&self) -> Result<(), BrokerError> {
-        // Los tres tipos de opción: el bróker emite por instrumento.
-        for instrumento in ["binary-option", "turbo-option", "digital-option"] {
-            self.suscribir(
-                &format!("comision:{instrumento}"),
-                msg::SUBSCRIBE_MESSAGE,
-                &json!({
-                    "name": msg::COMMISSION_CHANGED,
-                    "version": "1.0",
-                    "params": { "routingFilters": { "instrument_type": instrumento } }
-                }),
-            )
-            .await?;
-        }
-        Ok(())
-    }
     async fn buy_binary(&self, req: BuyBinaryRequest) -> Result<OrderId, BrokerError> {
         // BLITZ tiene su propia petición (duración en segundos y payout): se
         // delega en `buy_blitz` para no transportar segundos en
@@ -552,7 +436,162 @@ impl Broker for IqOptionBroker {
         }
     }
 
-    async fn buy_blitz(&self, req: BuyBlitzRequest) -> Result<OrderId, BrokerError> {
+    /// Lee el resultado de la caché local, alimentada por los eventos de
+    /// cierre (`option-closed`, `socket-option-closed`, `position-changed`).
+    ///
+    /// **No hace ninguna petición al bróker**: si el cierre aún no ha llegado
+    /// por eventos, devuelve `OperationResult::Pending`.
+    async fn get_operation_result(
+        &self,
+        order_id: &OrderId,
+    ) -> Result<OperationResult, BrokerError> {
+        let cache = self.resultados.read().await;
+        Ok(cache
+            .get(order_id)
+            .copied()
+            .unwrap_or(OperationResult::Pending))
+    }
+
+    // -------- Eventos --------
+
+    async fn events(&self) -> Result<EventStream, BrokerError> {
+        let rx = self.eventos.subscribe();
+        let stream = unfold(rx, |mut rx| async move {
+            match rx.recv().await {
+                Ok(ev) => Some((ev, rx)),
+                // Pérdida de continuidad: se informa y el stream continúa, en
+                // vez de cerrarse como si la sesión hubiera terminado.
+                Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                    Some((Event::EventsLost { count: n }, rx))
+                }
+                Err(tokio::sync::broadcast::error::RecvError::Closed) => None,
+            }
+        });
+        Ok(Box::pin(stream))
+    }
+}
+
+impl IqOptionBroker {
+    pub async fn get_technical_indicators(
+        &self,
+        symbol: &str,
+    ) -> Result<TechnicalIndicators, BrokerError> {
+        let asset_id = {
+            let catalogo = self.catalogo.read().await;
+            catalogo
+                .iter()
+                .find(|a| a.symbol == symbol)
+                .map(|a| a.opcode)
+                .ok_or_else(|| {
+                    BrokerError::Domain(crate::domain::error::DomainError::AssetNotFound(
+                        symbol.into(),
+                    ))
+                })?
+        };
+        // Mensaje: `trading-signals.get-technical-indicators` v1.0, body {id}.
+        // El `id` DEBE ser entero (string → INVALID_SCHEMA). Respuesta:
+        // `technical-indicators` con `msg.indicators`, o `msg.message` de error.
+        let respuesta = self
+            .solicitar(
+                msg::SEND_MESSAGE,
+                &json!({
+                    "name": msg::TECHNICAL_INDICATORS,
+                    "version": "1.0",
+                    "body": { "id": asset_id }
+                }),
+                msg::TECHNICAL_INDICATORS_RESPONSE,
+            )
+            .await?;
+        mapper::indicadores_desde_respuesta(&respuesta, symbol).map_err(BrokerError::Rejected)
+    }
+
+    pub async fn get_asset_profile(&self, symbol: &str) -> Result<AssetProfile, BrokerError> {
+        let asset_id = {
+            let catalogo = self.catalogo.read().await;
+            catalogo
+                .iter()
+                .find(|a| a.symbol == symbol)
+                .map(|a| a.opcode)
+                .ok_or_else(|| {
+                    BrokerError::Domain(crate::domain::error::DomainError::AssetNotFound(
+                        symbol.into(),
+                    ))
+                })?
+        };
+        // GraphQL: el broker responde `financial-information` con data.active.
+        let respuesta = self
+            .solicitar(
+                msg::SEND_MESSAGE,
+                &json!({
+                    "name": msg::GET_FINANCIAL_INFORMATION,
+                    "version": "1.0",
+                    "body": {
+                        "query": mapper::QUERY_ASSET_PROFILE,
+                        "operationName": "GetAssetProfileInfo",
+                        "variables": { "activeId": asset_id }
+                    }
+                }),
+                msg::FINANCIAL_INFORMATION,
+            )
+            .await?;
+        mapper::perfil_desde_financial(symbol, &respuesta).map_err(BrokerError::Rejected)
+    }
+
+    pub async fn subscribe_live_deals(&self, symbol: &str) -> Result<(), BrokerError> {
+        let active_id = {
+            let catalogo = self.catalogo.read().await;
+            catalogo
+                .iter()
+                .find(|a| a.symbol == symbol)
+                .map(|a| a.opcode)
+                .ok_or_else(|| {
+                    BrokerError::Domain(crate::domain::error::DomainError::AssetNotFound(
+                        symbol.into(),
+                    ))
+                })?
+        };
+        // Ambos canales: el agregado y el específico de binarias.
+        self.suscribir(
+            &format!("live-deals:{symbol}"),
+            msg::SUBSCRIBE_MESSAGE,
+            &json!({
+                "name": msg::LIVE_DEAL,
+                "version": "1.0",
+                "params": { "routingFilters": { "instrument_active_id": active_id } }
+            }),
+        )
+        .await?;
+        self.suscribir(
+            &format!("live-deals-bin:{symbol}"),
+            msg::SUBSCRIBE_MESSAGE,
+            &json!({
+                "name": msg::LIVE_DEAL_BINARY,
+                "version": "1.0",
+                "params": { "routingFilters": { "active_id": active_id, "option_type": "binary-option" } }
+            }),
+        )
+        .await?;
+        Ok(())
+    }
+
+    pub async fn subscribe_commission_changes(&self) -> Result<(), BrokerError> {
+        // Los tres tipos de opción: el bróker emite por instrumento.
+        for instrumento in ["binary-option", "turbo-option", "digital-option"] {
+            self.suscribir(
+                &format!("comision:{instrumento}"),
+                msg::SUBSCRIBE_MESSAGE,
+                &json!({
+                    "name": msg::COMMISSION_CHANGED,
+                    "version": "1.0",
+                    "params": { "routingFilters": { "instrument_type": instrumento } }
+                }),
+            )
+            .await?;
+        }
+        Ok(())
+    }
+
+    pub async fn buy_blitz(&self, req: BuyBlitzRequest) -> Result<OrderId, BrokerError> {
         // El blitz se resuelve contra el grupo blitz del catálogo, cuyos
         // metadatos (duraciones en segundos, rollovers) son propios.
         let asset = {
@@ -646,7 +685,7 @@ impl Broker for IqOptionBroker {
         Ok(id.to_string())
     }
 
-    async fn buy_digital_spot(&self, req: BuyDigitalRequest) -> Result<OrderId, BrokerError> {
+    pub async fn buy_digital_spot(&self, req: BuyDigitalRequest) -> Result<OrderId, BrokerError> {
         let (asset_id, periodo) = {
             let catalogo = self.catalogo.read().await;
             let asset = catalogo
@@ -757,39 +796,5 @@ impl Broker for IqOptionBroker {
             }
             Err(e) => Err(e),
         }
-    }
-
-    /// Lee el resultado de la caché local, alimentada por los eventos de
-    /// cierre (`option-closed`, `socket-option-closed`, `position-changed`).
-    ///
-    /// **No hace ninguna petición al bróker**: si el cierre aún no ha llegado
-    /// por eventos, devuelve `OperationResult::Pending`.
-    async fn get_operation_result(
-        &self,
-        order_id: &OrderId,
-    ) -> Result<OperationResult, BrokerError> {
-        let cache = self.resultados.read().await;
-        Ok(cache
-            .get(order_id)
-            .copied()
-            .unwrap_or(OperationResult::Pending))
-    }
-
-    // -------- Eventos --------
-
-    async fn events(&self) -> Result<EventStream, BrokerError> {
-        let rx = self.eventos.subscribe();
-        let stream = unfold(rx, |mut rx| async move {
-            match rx.recv().await {
-                Ok(ev) => Some((ev, rx)),
-                // Pérdida de continuidad: se informa y el stream continúa, en
-                // vez de cerrarse como si la sesión hubiera terminado.
-                Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
-                    Some((Event::EventsLost { count: n }, rx))
-                }
-                Err(tokio::sync::broadcast::error::RecvError::Closed) => None,
-            }
-        });
-        Ok(Box::pin(stream))
     }
 }

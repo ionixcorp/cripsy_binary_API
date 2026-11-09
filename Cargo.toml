@@ -1,6 +1,6 @@
 [package]
 name = "cripsy-binary-api"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2021"
 rust-version = "1.86"
 description = "API moderna multibroker para opciones binarias (Rust, sync y async)"
@@ -10,6 +10,7 @@ homepage = "https://ionixcorp.github.io/cripsy_binary_API/"
 readme = "README.md"
 keywords = ["trading", "binary-options", "broker", "async", "api"]
 categories = ["api-bindings", "asynchronous"]
+exclude = ["examples/deriv_probe.rs", "python/**"]
 
 [lib]
 name = "cripsy_binary_api"

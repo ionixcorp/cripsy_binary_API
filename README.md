@@ -1,6 +1,6 @@
 # cripsy_binary_API
 
-![cripsy_binary_API: cliente Rust para la API de IQ Option](https://raw.githubusercontent.com/ionixcorp/cripsy_binary_API/master/docs/assets/banner.svg)
+![cripsy_binary_API: cliente Rust multibróker de opciones binarias](https://raw.githubusercontent.com/ionixcorp/cripsy_binary_API/master/docs/assets/banner.svg)
 
 [![Licencia: MIT](https://img.shields.io/badge/licencia-MIT-blue.svg)](LICENSE)
 [![Rust 1.86+](https://img.shields.io/badge/rust-1.86%2B-orange.svg)](https://www.rust-lang.org)
@@ -9,10 +9,12 @@
 [![crates.io](https://img.shields.io/crates/v/cripsy-binary-api.svg)](https://crates.io/crates/cripsy-binary-api)
 [![docs.rs](https://img.shields.io/docsrs/cripsy-binary-api.svg)](https://docs.rs/cripsy-binary-api)
 
-Librería cliente en Rust para la API de IQ Option. Proporciona una interfaz para
-la sesión, el catálogo de activos, las velas históricas, el stream de velas y
-ticks, y el envío de órdenes clásicas, digitales y blitz. El mismo motor se
-ofrece como núcleo `async` y como fachada bloqueante.
+Librería cliente en Rust para brókers de opciones binarias. Un mismo contrato
+(`Broker`) cubre sesión, catálogo, velas, ticks y órdenes rise/fall; cada
+adaptador traduce su protocolo. Hoy están integrados **IQ Option** (rise/fall,
+digital y blitz) y **Deriv** (rise/fall, con mercado público sin credenciales).
+El núcleo es `async`; la fachada bloqueante `SyncBroker` sigue disponible para
+IQ Option.
 
 Los resultados de las operaciones se entregan como eventos. El último resultado
 se lee de una caché local alimentada por esos eventos, sin consultar al bróker.
@@ -40,10 +42,37 @@ while let Some(evento) = eventos.next().await {
 }
 ```
 
+## 🎯 Alcance
+
+La API opera **opciones binarias rise/fall** (`CALL`/`PUT`) en todos los activos
+que el bróker habilite, y entrega **datos de cualquier activo**: catálogo,
+velas y ticks nativos. No es una limitación técnica, es el mercado objetivo.
+Otras familias (multiplicadores, acumuladores, dígitos, barreras) quedan
+documentadas como expansión futura y no se simulan sobre rise/fall.
+
+## 🧩 Brókers
+
+| Bróker | Operación | Datos | Credenciales |
+|---|---|---|---|
+| IQ Option | rise/fall, digital, blitz | catálogo, velas, ticks | propias |
+| Deriv | rise/fall | catálogo, velas, ticks nativos | opcionales: modo público gratuito |
+
+Deriv funciona sin credenciales para mercado y cotización de payout; operar
+exige un PAT con scope `trade` (o un access token OAuth). Copia `.env.example`
+a `.env` y completa solo lo que uses: `.env` nunca se versiona.
+
+Densidad de ticks medida (ventana de 8 s, gateway público de Deriv,
+2026-11-09): `R_100` ≈0,5/s (índice de 2 s), `1HZ100V` y `1HZ10V` 1,0/s,
+`frxAUDCAD` 1,0/s, `cryBTCUSD` 1,0/s y `frxXAGUSD` entre 0,75 y 1,0/s. IQ Option mide
+~3 ticks/s por activo en mercados OTC. En ambos casos es el stream del bróker,
+sin polling.
+
 ## 📌 Estado del proyecto
 
-Versión `0.1.0`. Cada componente se probó mediante conexiones reales contra el
-bróker (cuenta de práctica) el 8 de noviembre de 2026:
+Versión `0.3.0`. Cada componente se probó mediante conexiones reales contra el
+bróker (cuenta de práctica) el 8 y 9 de noviembre de 2026.
+
+**IQ Option**
 
 | Componente | Estado | Comprobación |
 |---|---|---|
@@ -60,6 +89,19 @@ bróker (cuenta de práctica) el 8 de noviembre de 2026:
 | Historial de posiciones | Probado contra el bróker | PnL realizado y apalancamiento |
 | Indicadores del bróker | Depende del activo | El bróker rechaza algunos activos |
 | Canales de plataforma | Probado contra el bróker | Comisiones y live-deal |
+
+**Deriv**
+
+| Componente | Estado | Comprobación |
+|---|---|---|
+| Modo público | Probado contra el bróker | 89 activos, velas y payout sin credenciales |
+| Sesión autenticada | Probado contra el bróker | OTP por REST, balance demo y offset |
+| Ticks nativos | Probado contra el bróker | Índice, forex, cripto y materia prima |
+| Compra y venta rise/fall | Probado en cuenta demo | `Win(0.21)` y venta anticipada |
+| Cierre por evento | Probado en cuenta demo | `proposal_open_contract` |
+| Historial | Probado contra el bróker | `profit_table` paginado, PnL derivado |
+| Reconexión | Probado contra el bróker | OTP nuevo, replay y 2 396 ms de caída |
+| Reconciliación | Probado en cuenta demo | Cierre tras 72 s sin red, un solo evento |
 
 Los detalles, límites y casos no soportados están en
 [`docs/01_introduccion.es.md`](docs/01_introduccion.es.md).
@@ -79,9 +121,11 @@ La librería incluye las siguientes funcionalidades:
 | 🧾 | Historial | Posiciones cerradas con PnL realizado, importe invertido y apalancamiento |
 | 🌐 | Datos de plataforma | Perfil fundamental del activo, comisiones en vivo y operaciones de terceros |
 | 🧠 | Señales del bróker | Humor de traders, activos populares e indicadores publicados por el bróker |
-| 🔁 | Modos de consumo | `async`/`await` o `SyncBroker` bloqueante |
+| 🔁 | Modos de consumo | `async`/`await` en todos los brókers; `SyncBroker` bloqueante para IQ Option |
 | 🔌 | Continuidad | Reconexión automática con reautenticación, replay de suscripciones y aviso por eventos |
 | 🧩 | Multibróker | El trait `Broker` y un registro de adaptadores separan el dominio del transporte |
+| 🪙 | Deriv | Adaptador propio (REST + OTP + WebSocket), modo público y cuenta demo/real |
+| 📡 | Densidad nativa | Ticks por activo sin polling, con replay de suscripciones al reconectar |
 
 ### Datos disponibles a través de la API
 
@@ -131,7 +175,7 @@ O en `Cargo.toml`:
 
 ```toml
 [dependencies]
-cripsy-binary-api = "0.2"
+cripsy-binary-api = "0.3"
 ```
 
 Instalación desde el repositorio (para desarrollo o para probar `master`):
@@ -147,6 +191,27 @@ Compilación manual:
 ```powershell
 cargo build --release                                            # async (por defecto)
 cargo build --release --no-default-features --features blocking  # sync
+
+### Python (binding nativo)
+
+El repositorio incluye un binding PyO3/maturin con la misma superficie para
+IQ Option y Deriv. El crate de crates.io no cambia: el binding es un paquete
+independiente en `python/`.
+
+```powershell
+pip install https://github.com/ionixcorp/cripsy_binary_API/releases/download/v0.3.0/cripsy_binary_api-0.3.0-cp310-abi3-win_amd64.whl
+```
+
+```python
+from cripsy_binary_api import Client
+
+cliente = Client.connect_deriv()     # público, sin credenciales
+print(len(cliente.assets()), "activos")
+cliente.close()
+```
+
+Estado de PyPI, instalación desde el repositorio y límites:
+[`docs/11_python/01_python.es.md`](docs/11_python/01_python.es.md).
 ```
 
 Las credenciales se leen del entorno. `.env` está ignorado por git:
@@ -154,6 +219,11 @@ Las credenciales se leen del entorno. `.env` está ignorado por git:
 ```dotenv
 IQOPTION_EMAIL = "tu-correo@ejemplo.com"
 IQOPTION_PASSWORD = "tu-contrasena"
+
+# Deriv (opcional: sin token solo se usa el mercado público y el payout)
+DERIV_TOKEN = "tu-token-con-scope-trade"
+DERIV_APPID = "tu-app-id"
+DERIV_ACCOUNT_ID = "DOT00000000"
 ```
 
 ## ✅ Verificación
@@ -162,26 +232,38 @@ Los scripts incluidos ejecutan comprobaciones reales contra el bróker. Leen
 `.env`, usan la cuenta de práctica y no requieren configuración adicional:
 
 ```powershell
-.\scripts\conectar.ps1        # sesión, balance, catálogo, velas y stream
-.\scripts\balance.ps1         # balance, tipo de cuenta y balance_id
-.\scripts\operar.ps1          # orden de 1 USD en demo y cierre por evento
-.\scripts\verificar_todo.ps1  # recorre todas las capacidades documentadas
+.\scripts\conectar.ps1            # IQ Option: sesión, balance, catálogo, velas y stream
+.\scripts\balance.ps1             # IQ Option: balance, tipo de cuenta y balance_id
+.\scripts\operar.ps1              # IQ Option: orden de 1 USD en demo y cierre por evento
+.\scripts\verificar_iqoption.ps1  # IQ Option: 34 comprobaciones
+.\scripts\verificar_deriv.ps1     # Deriv: público, ticks, órdenes y caídas en demo
+.\scripts\verificar_todo.ps1      # ambos, en secuencia
 ```
 
-`verificar_todo.ps1` informa `[OK]`, `[FALLO]` o `[AVISO]` por capacidad y
-termina con código 1 si algo falla. `-SoloLectura` omite el envío de órdenes.
+Cada verificador informa `[OK]`, `[FALLO]` o `[AVISO]` por capacidad y termina
+con código 1 si algo falla. `-SoloLectura` omite las órdenes y las caídas
+forzadas.
 
-Resultado de la última ejecución (cuenta de práctica, 9 de noviembre de 2026):
-34 comprobaciones correctas, 0 fallos, 1 aviso — el bróker no publica
-indicadores para el activo consultado.
+Resultados de la última ejecución (cuentas demo, 9 de noviembre de 2026):
+
+- **IQ Option:** 34 comprobaciones correctas, 0 fallos, 1 aviso — el bróker no
+  publica indicadores para el activo consultado.
+- **Deriv:** conexión pública y autenticada, 6 activos con ticks, compra/venta
+  `Win(0.21)`, reconexión con OTP nuevo (2 396 ms) y reconciliación de un cierre
+  ocurrido durante 72 s sin red, sin reenviar la orden.
 
 ## 🧭 Uso
 
 ```powershell
-cargo run --example ejemplo_lectura      # async: sesión, catálogo, velas, stream
-cargo run --example ejemplo_sincrono     # fachada bloqueante
-cargo run --example ejemplo_orden_demo   # orden en demo y cierre por evento
-cargo run --example verificar_todo       # verificación integral
+cargo run --example ejemplo_lectura      # IQ Option (async)
+cargo run --example ejemplo_sincrono     # IQ Option (fachada bloqueante)
+cargo run --example ejemplo_orden_demo   # IQ Option: orden demo y cierre
+cargo run --example verificar_todo       # IQ Option: verificación integral
+cargo run --example deriv_conectar       # Deriv: público o cuenta demo
+cargo run --example deriv_ticks          # Deriv: ticks nativos y reconexión
+cargo run --example deriv_densidad       # Deriv: densidad por activo
+cargo run --example deriv_orden_demo     # Deriv: compra/venta rise/fall demo
+cargo run --example deriv_reconciliacion # Deriv: cierre ocurrido sin red
 ```
 
 ## 📚 Documentación
@@ -200,6 +282,8 @@ cargo run --example verificar_todo       # verificación integral
 | [Herramientas](docs/07_herramientas/01_herramientas.es.md) | Instalación, scripts y adaptadores |
 | [Indicadores](docs/08_indicadores/01_indicadores.es.md) | Canal de indicadores del bróker |
 | [Reconexión](docs/09_reconexion/01_reconexion.es.md) | Continuidad: qué resuelve la API y qué debe hacer el consumidor |
+| [Deriv](docs/10_deriv/01_deriv.es.md) | Adaptador Deriv: alcance, credenciales, densidad, límites y reconciliación |
+| [Python](docs/11_python/01_python.es.md) | Binding PyO3/maturin: instalación, superficie y límites |
 
 Para generar la documentación navegable en local:
 
@@ -227,17 +311,18 @@ installation/    instalación guiada y verificación de entorno
 ## 🗺️ Hoja de ruta
 
 El trait `Broker` y el registro de adaptadores permiten incorporar nuevos
-brókers sin modificar el dominio ni el transporte. En próximas versiones se
-prevé añadir adaptadores para otros brókers, entre ellos **Deriv**, **Quotex** y
-otros; el orden y el alcance dependerán de la disponibilidad de sus interfaces
-documentadas y de las pruebas correspondientes. No hay fechas comprometidas.
+brókers sin modificar el dominio ni el transporte. **IQ Option** y **Deriv** ya
+están integrados; en próximas versiones se prevé añadir otros, entre ellos
+**Quotex**. El orden y el alcance dependerán de la disponibilidad de sus
+interfaces documentadas y de las pruebas correspondientes. No hay fechas
+comprometidas.
 
 Las propuestas y discusiones se atienden en los issues del repositorio.
 
 ## 🧪 Calidad
 
 ```powershell
-.\scripts\verify.ps1   # fmt + clippy -D warnings + 71 tests + build blocking + docs
+.\scripts\verify.ps1   # fmt + clippy -D warnings + 85 tests + build blocking + docs
 ```
 
 La compuerta es la misma que se ejecuta en Windows y en Linux. Los tests no
@@ -278,6 +363,11 @@ Limitaciones conocidas de la versión actual:
   suscripción se retira en el siguiente despacho de velas.
 - **Pérdida de eventos.** Si el consumidor se atrasa más que el buffer (1024),
   recibe `Event::EventsLost { count }` y el stream continúa.
+- **Deriv no tiene fachada sincrónica.** `SyncBroker` sigue siendo exclusivo de
+  IQ Option; el adaptador Deriv es `async`.
+- **Identificadores de Deriv.** Las cuentas son cadenas (`DOT…`, `VRTC…`,
+  `CR…`); `balance_id` y `Asset.opcode` usan un sustituto determinista
+  documentado. Usa `symbol` y `account_id`.
 
 ```rust
 use cripsy_binary_api::{mensaje_consumidor, revisar_config};
