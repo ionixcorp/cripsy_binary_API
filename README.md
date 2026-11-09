@@ -69,7 +69,7 @@ sin polling.
 
 ## 📌 Estado del proyecto
 
-Versión `0.3.1`. Cada componente se probó mediante conexiones reales contra el
+Versión `0.3.2`. Cada componente se probó mediante conexiones reales contra el
 bróker (cuenta de práctica) el 8 y 9 de noviembre de 2026.
 
 **IQ Option**
@@ -118,6 +118,7 @@ La librería incluye las siguientes funcionalidades:
 | ⚡ | Stream | Suscripción a velas por intervalo y recepción de ticks nativos del activo |
 | 🎯 | Órdenes | Clásicas (turbo y binary), digitales v2, blitz v2 y venta anticipada (buyback) |
 | 📈 | Resultados | Cierre tipado (`Win`, `Loss`, `Equal`) por evento, con caché consultable |
+| 💱 | Cotización | `quote_payout` por expiración y tipo; devuelve `available: false` en vez de inventar un payout |
 | 🧾 | Historial | Posiciones cerradas con PnL realizado, importe invertido y apalancamiento |
 | 🌐 | Datos de plataforma | Perfil fundamental del activo, comisiones en vivo y operaciones de terceros |
 | 🧠 | Señales del bróker | Humor de traders, activos populares e indicadores publicados por el bróker |
@@ -375,6 +376,8 @@ Limitaciones conocidas de la versión actual:
   sin el stream activo una orden puede permanecer en `Pending`.
 - **`get_payout` devuelve el payout del catálogo.** El parámetro de expiración
   no cambia la consulta; los cambios en vivo llegan por `Event::PayoutChanged`.
+  Para una combinación concreta usa `quote_payout`: si el bróker no la ofrece,
+  devuelve `available: false` y no inventa un porcentaje.
 - **Sin baja explícita de suscripciones.** Al soltar el `CandleStream`, la
   suscripción se retira en el siguiente despacho de velas.
 - **Pérdida de eventos.** Si el consumidor se atrasa más que el buffer (1024),

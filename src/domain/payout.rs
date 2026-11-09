@@ -2,6 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::operation::OptionType;
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Payout {
     pub symbol: String,
@@ -13,6 +15,46 @@ pub struct Payout {
     pub strike: Option<f64>,
     /// El bróker reporta el activo cerrado (ask nulo ⇒ sin payout).
     pub closed: bool,
+}
+
+/// Cotización de payout para una combinación concreta.
+///
+/// A diferencia de [`Payout`], distingue “sin cotización” (`available: false`)
+/// de un payout real. `captured_at == 0` indica que no se capturó una
+/// cotización del bróker.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PayoutQuote {
+    pub symbol: String,
+    pub option_type: OptionType,
+    pub expiration_seconds: u64,
+    /// Porcentaje de ganancia 0-100; `None` si no hay cotización.
+    pub profit_percent: Option<f64>,
+    pub min_amount: Option<f64>,
+    pub max_amount: Option<f64>,
+    /// `false` si el bróker no ofrece la combinación o no hay dato.
+    pub available: bool,
+    /// Epoch segundos de la captura; `0` si no hubo captura.
+    pub captured_at: i64,
+}
+
+impl PayoutQuote {
+    /// Cotización ausente: no inventa `0.0` ni un payout.
+    pub fn unavailable(
+        symbol: impl Into<String>,
+        option_type: OptionType,
+        expiration_seconds: u64,
+    ) -> Self {
+        Self {
+            symbol: symbol.into(),
+            option_type,
+            expiration_seconds,
+            profit_percent: None,
+            min_amount: None,
+            max_amount: None,
+            available: false,
+            captured_at: 0,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -81,5 +123,19 @@ mod tests {
             captured_at: 0,
         };
         assert!(list.nearest(1.0).is_none());
+    }
+
+    #[test]
+    fn payout_no_disponible_no_fabrica_porcentaje() {
+        let quote = PayoutQuote::unavailable("EURUSD", OptionType::Binary, 60);
+        assert!(!quote.available);
+        assert_eq!(quote.profit_percent, None);
+        assert_eq!(quote.min_amount, None);
+        assert_eq!(quote.max_amount, None);
+        assert_eq!(quote.captured_at, 0);
+
+        let json = serde_json::to_string(&quote).unwrap();
+        assert!(json.contains("\"available\":false"));
+        assert!(json.contains("\"profit_percent\":null"));
     }
 }

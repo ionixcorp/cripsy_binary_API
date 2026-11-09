@@ -9,7 +9,7 @@
 use std::collections::HashMap;
 
 use cripsy_binary_api::broker::{Broker, BrokerParams, DerivBroker, DerivConfig};
-use cripsy_binary_api::domain::{CandleRequest, MarketStatus};
+use cripsy_binary_api::domain::{CandleRequest, MarketStatus, OptionType};
 
 fn cargar_env() -> HashMap<String, String> {
     let mut mapa = HashMap::new();
@@ -104,6 +104,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "payout(60s): {:.2}% cerrado={}",
         payout.profit_percent, payout.closed
     );
+
+    for (etiqueta, opcion, segundos) in [
+        ("rise/fall 60s", OptionType::Binary, 60),
+        ("rise/fall 300s", OptionType::Binary, 300),
+        ("digital 60s", OptionType::Digital, 60),
+    ] {
+        match broker.quote_payout("R_100", opcion, segundos, 1.0).await {
+            Ok(q) => println!(
+                "quote {etiqueta}: available={} profit={:?} min={:?} max={:?} captured_at={}",
+                q.available, q.profit_percent, q.min_amount, q.max_amount, q.captured_at
+            ),
+            Err(e) => println!("quote {etiqueta}: error {e}"),
+        }
+    }
 
     match broker.get_balance().await {
         Ok(b) => {

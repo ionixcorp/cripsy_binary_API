@@ -5,7 +5,7 @@ use futures_core::Stream;
 
 use crate::domain::{
     AccountType, Asset, Balance, BuyBinaryRequest, Candle, CandleRequest, CandleSubscribe, Event,
-    MarketStatus, OperationResult, OptionType, OrderId, Payout, PositionHistory,
+    MarketStatus, OperationResult, OptionType, OrderId, Payout, PayoutQuote, PositionHistory,
 };
 
 use super::config::BrokerParams;
@@ -76,6 +76,30 @@ pub trait Broker: Send + Sync {
         symbol: &str,
         expiration_seconds: u64,
     ) -> Result<Payout, BrokerError>;
+
+    /// Cotización por expiración y tipo de opción.
+    ///
+    /// La referencia actual es **CALL**: Deriv traduce `OptionType::Binary` a
+    /// `CALL` y la cotización digital de IQ usa `call.bid` del spot. El tipo no
+    /// transporta dirección, así que no se debe asumir que PUT paga lo mismo.
+    ///
+    /// El default no inventa un payout: devuelve `available: false` con
+    /// `profit_percent: None`. Un adaptador que pueda cotizar debe
+    /// sobrescribirlo.
+    async fn quote_payout(
+        &self,
+        symbol: &str,
+        option_type: OptionType,
+        expiration_seconds: u64,
+        amount: f64,
+    ) -> Result<PayoutQuote, BrokerError> {
+        let _ = amount;
+        Ok(PayoutQuote::unavailable(
+            symbol,
+            option_type,
+            expiration_seconds,
+        ))
+    }
 
     // -------- Indicadores técnicos del bróker --------
 

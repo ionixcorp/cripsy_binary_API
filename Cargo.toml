@@ -1,6 +1,6 @@
 [package]
 name = "cripsy-binary-api"
-version = "0.3.1"
+version = "0.3.2"
 edition = "2021"
 rust-version = "1.86"
 description = "API moderna multibroker para opciones binarias (Rust, sync y async)"

@@ -258,6 +258,17 @@ fn duracion(segundos: u64) -> (u64, &'static str) {
     }
 }
 
+/// Tipo de contrato Deriv para una opción del dominio.
+///
+/// Deriv solo ofrece rise/fall en este adaptador; digital y blitz no se
+/// traducen a una cotización rise/fall.
+fn contrato_de(opcion: OptionType) -> Option<&'static str> {
+    match opcion {
+        OptionType::Binary => Some("CALL"),
+        OptionType::Digital | OptionType::Blitz => None,
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Adaptador
 // ---------------------------------------------------------------------------
@@ -663,6 +674,71 @@ impl Broker for DerivBroker {
             }),
             Err(e) => Err(e),
         }
+    }
+
+    async fn quote_payout(
+        &self,
+        symbol: &str,
+        option_type: OptionType,
+        expiration_seconds: u64,
+        amount: f64,
+    ) -> Result<PayoutQuote, BrokerError> {
+        if !amount.is_finite() || amount <= 0.0 {
+            return Err(BrokerError::Domain(DomainError::InvalidAmount(format!(
+                "deriv: amount debe ser positivo, recibido {amount}"
+            ))));
+        }
+        if expiration_seconds == 0 {
+            return Err(BrokerError::Rejected(
+                "deriv: expiration_seconds debe ser positivo".into(),
+            ));
+        }
+        let Some(contract_type) = contrato_de(option_type) else {
+            return Ok(PayoutQuote::unavailable(
+                symbol,
+                option_type,
+                expiration_seconds,
+            ));
+        };
+
+        let currency = self.divisa().await?;
+        let (duracion, unidad) = duracion(expiration_seconds);
+        self.interna.limite.esperar(Clase::Trading).await;
+        let valor = self
+            .interna
+            .solicitar(
+                json!({
+                    "proposal": 1,
+                    "amount": amount,
+                    "basis": "stake",
+                    "contract_type": contract_type,
+                    "currency": currency,
+                    "underlying_symbol": symbol,
+                    "duration": duracion,
+                    "duration_unit": unidad,
+                }),
+                PLAZO,
+            )
+            .await?;
+
+        let Some(profit_percent) = protocol::payout_porcentaje(&valor, amount) else {
+            return Ok(PayoutQuote::unavailable(
+                symbol,
+                option_type,
+                expiration_seconds,
+            ));
+        };
+
+        Ok(PayoutQuote {
+            symbol: symbol.to_string(),
+            option_type,
+            expiration_seconds,
+            profit_percent: Some(profit_percent),
+            min_amount: None,
+            max_amount: None,
+            available: true,
+            captured_at: epoch_secs(),
+        })
     }
 
     async fn buy_binary(&self, req: BuyBinaryRequest) -> Result<OrderId, BrokerError> {
@@ -1345,6 +1421,13 @@ mod tests {
             tipo_cuenta("X", AccountSelection::Default),
             AccountType::Unknown
         );
+    }
+
+    #[test]
+    fn contrato_de_solo_traduce_rise_fall() {
+        assert_eq!(contrato_de(OptionType::Binary), Some("CALL"));
+        assert_eq!(contrato_de(OptionType::Digital), None);
+        assert_eq!(contrato_de(OptionType::Blitz), None);
     }
 
     #[test]

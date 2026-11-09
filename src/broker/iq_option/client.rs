@@ -249,7 +249,8 @@ impl Broker for IqOptionBroker {
                 ))
             })?;
         let profit_percent = asset.payout_percent.unwrap_or(0.0);
-        // El payout digital en vivo (price-splitter) se añade en la Fase 5.
+        // El payout digital en vivo se consulta por `quote_payout`; este método
+        // conserva el valor del catálogo por compatibilidad.
         Ok(Payout {
             symbol: symbol.to_string(),
             expiration_seconds,
@@ -258,6 +259,117 @@ impl Broker for IqOptionBroker {
             strike: None,
             closed: asset.status == MarketStatus::Closed,
         })
+    }
+
+    /// Cotización viva por expiración y tipo de opción.
+    ///
+    /// IQ Option publica el payout digital en
+    /// `price-splitter.client-price-generated`: la entrada `SPT` es el spot y
+    /// `call.bid` el precio con el que se calcula el payout de CALL. El canal
+    /// se verificó en vivo con la cuenta; no hubo frames equivalentes para
+    /// `instrument-quotes-generated` (binary/turbo/blitz). Por eso esos tipos
+    /// devuelven `available: false` en vez de reutilizar el payout del
+    /// catálogo, que no es una cotización por expiración.
+    async fn quote_payout(
+        &self,
+        symbol: &str,
+        option_type: OptionType,
+        expiration_seconds: u64,
+        amount: f64,
+    ) -> Result<PayoutQuote, BrokerError> {
+        if expiration_seconds == 0 {
+            return Err(BrokerError::Rejected(
+                "iq_option: expiration_seconds debe ser positivo".into(),
+            ));
+        }
+
+        let asset = {
+            let catalogo = self.catalogo.read().await;
+            catalogo
+                .iter()
+                .find(|a| a.symbol == symbol)
+                .cloned()
+                .ok_or_else(|| {
+                    BrokerError::Domain(crate::domain::error::DomainError::AssetNotFound(
+                        symbol.into(),
+                    ))
+                })?
+        };
+
+        // `amount` no altera el precio digital de IQ; se conserva por contrato.
+        let _ = amount;
+
+        if option_type != OptionType::Digital || asset.status == MarketStatus::Closed {
+            return Ok(PayoutQuote::unavailable(
+                symbol,
+                option_type,
+                expiration_seconds,
+            ));
+        }
+
+        self.suscribir(
+            &format!("splitter:{}", asset.opcode),
+            msg::SUBSCRIBE_MESSAGE,
+            &json!({
+                "name": msg::PRICE_SPLITTER,
+                "version": "1.0",
+                "params": { "routingFilters": { "instrument_type": "digital-option", "asset_id": asset.opcode } }
+            }),
+        )
+        .await?;
+
+        let mut precios = self.precios.subscribe();
+        // Mismo plazo que la compra digital: si el bróker no publica el periodo,
+        // la respuesta correcta es “sin cotización”, no un payout inventado.
+        let plazo = std::time::Duration::from_secs(15);
+        let limite = tokio::time::Instant::now() + plazo;
+        loop {
+            let restante = limite.saturating_duration_since(tokio::time::Instant::now());
+            if restante.is_zero() {
+                return Ok(PayoutQuote::unavailable(
+                    symbol,
+                    option_type,
+                    expiration_seconds,
+                ));
+            }
+            let mensaje = match tokio::time::timeout(restante, precios.recv()).await {
+                Err(_) => {
+                    return Ok(PayoutQuote::unavailable(
+                        symbol,
+                        option_type,
+                        expiration_seconds,
+                    ))
+                }
+                Ok(Ok(mensaje)) => mensaje,
+                Ok(Err(tokio::sync::broadcast::error::RecvError::Lagged(_))) => continue,
+                Ok(Err(tokio::sync::broadcast::error::RecvError::Closed)) => {
+                    return Err(BrokerError::Internal(
+                        "iq_option: canal de precios cerrado".into(),
+                    ))
+                }
+            };
+
+            if mensaje.get("asset_id").and_then(|v| v.as_u64()) != Some(u64::from(asset.opcode))
+                || mensaje.get("period").and_then(|v| v.as_u64()) != Some(expiration_seconds)
+            {
+                continue;
+            }
+
+            let Some(payout) = mapper::payout_price_splitter(&mensaje, Direction::Call) else {
+                continue;
+            };
+            let extras = asset.extras.as_ref();
+            return Ok(PayoutQuote {
+                symbol: symbol.to_string(),
+                option_type,
+                expiration_seconds,
+                profit_percent: Some(payout.profit_percent),
+                min_amount: extras.and_then(|e| e.min_amount),
+                max_amount: extras.and_then(|e| e.max_amount),
+                available: true,
+                captured_at: self.hora_servidor_segs().await,
+            });
+        }
     }
 
     async fn sell_option(&self, order_id: &OrderId) -> Result<(), BrokerError> {

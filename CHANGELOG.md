@@ -3,6 +3,39 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/)
 y versionado semántico.
 
+## [0.3.2] - 2026-11-09
+
+### Añadido
+
+- `PayoutQuote` como cotización explícita por expiración y tipo de opción.
+  Distingue una cotización real de la ausencia de datos con `available: false`
+  y `profit_percent: None`; no fabrica un `0.0`.
+- `Broker::quote_payout` con implementación por defecto que devuelve
+  `PayoutQuote::unavailable`; los adaptadores que pueden cotizar lo sobrescriben.
+- Deriv: cotización real por `proposal` para `OptionType::Binary` (traducida a
+  `CALL`); digital y blitz devuelven no disponible y los rechazos del bróker se
+  propagan.
+- IQ Option: cotización digital por `price-splitter.client-price-generated`,
+  con espera acotada de 15 s; binaria, turbo y blitz devuelven no disponible.
+
+### Documentado
+
+- La cotización de IQ usa el lado `CALL` del strike spot y `PayoutQuote` no
+  transporta dirección: no se asume simetría con `PUT`.
+- Notas de release en `docs/releases/0.3.2.md` y base del plan 0.4.0 actualizada
+  a 0.3.2.
+
+### Verificación
+
+- `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`
+  (89 passed) y `cargo build --no-default-features --features blocking`.
+- Prueba viva IQ: 25 OK, 0 fallos y 1 aviso documentado; Digital
+  `available=true` y Binary `available=false`.
+- Prueba viva Deriv: payout rise/fall 60 s y 300 s `available=true`; Digital
+  `available=false`; ticks y conexión autenticada OK.
+- `cargo package --allow-dirty` y `cargo publish --dry-run --allow-dirty`
+  completados; el paquete no incluye `.env`, `target`, `python/` ni artefactos.
+
 ## [0.3.1] - 2026-11-09
 
 ### Añadido

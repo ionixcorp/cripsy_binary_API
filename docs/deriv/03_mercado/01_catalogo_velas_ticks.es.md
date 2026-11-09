@@ -9,7 +9,8 @@
 | Velas históricas | `get_candles` | verificado (granularidades 1 m – 1 d) |
 | Velas en vivo | `subscribe_candles` | implementado |
 | Ticks nativos | `subscribe_ticks` → `Event::PriceTick` | verificado |
-| Payout cotizado | `get_payout` | verificado |
+| Payout del catálogo | `get_payout` | verificado |
+| Cotización por expiración | `quote_payout` | verificado (rise/fall; digital no disponible) |
 
 El histórico de Deriv no ofrece velas de 1 segundo en esta integración: la
 granularidad mínima es **1 minuto** y la máxima **1 día**. El límite de velas por
@@ -45,14 +46,37 @@ No hay polling: se entrega el stream del bróker tal cual.
 
 ## Payout
 
-`get_payout(symbol, seconds)` devuelve la cotización publicada para el activo y
-la duración pedida. No se consulta por importe ni por strike; el importe se elige
-al comprar y el bróker puede rechazarlo según sus mínimos y máximos.
+`get_payout(symbol, seconds)` devuelve el payout publicado en el catálogo para
+el activo. El parámetro de expiración no altera la consulta; los cambios en vivo
+llegan por `Event::PayoutChanged`.
 
 ```rust
 let payout = broker.get_payout("R_100", 60).await?;
 println!("{} %", payout.profit_percent);
 ```
+
+### Cotización por expiración
+
+`quote_payout(symbol, OptionType::Binary, seconds, amount)` consulta una
+propuesta real de Deriv (`proposal`) para rise/fall y la traduce a `CALL`.
+`amount` debe ser positivo e influye en la propuesta; no se usa el payout del
+catálogo como sustituto.
+
+```rust
+use cripsy_binary_api::domain::OptionType;
+
+let quote = broker.quote_payout("R_100", OptionType::Binary, 60, 1.0).await?;
+if quote.available {
+    println!("{:?} %", quote.profit_percent);
+} else {
+    println!("sin cotización para esta combinación");
+}
+```
+
+Digital y Blitz devuelven `available: false`; la compra de esos productos sigue
+rechazada. `PayoutQuote` no transporta dirección y la referencia es `CALL`: no
+se asume que `PUT` pague el mismo porcentaje. En Deriv, `min_amount` y
+`max_amount` quedan vacíos porque la propuesta no los publica.
 
 ## Densidad medida
 

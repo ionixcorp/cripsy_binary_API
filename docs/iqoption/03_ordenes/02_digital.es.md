@@ -6,7 +6,7 @@ que publica el stream de precios del bróker.
 ## Flujo
 
 1. Suscribirse a `price-splitter.client-price-generated` (el adaptador lo hace
-   solo al comprar).
+   al comprar o al consultar `quote_payout`).
 2. Esperar el mensaje del periodo deseado y tomar la entrada **spot**
    (`strike == "SPT"`): de ahí salen `call.symbol` o `put.symbol` (el
    `instrument_id`) y el `instrument_index`.
@@ -42,6 +42,31 @@ let orden = broker.buy_digital_spot(BuyDigitalRequest {
     strike: 0.0,   // lo elige el price-splitter
 }).await?;
 ```
+
+## Cotización de payout
+
+`quote_payout` usa el mismo canal para pedir el payout de una expiración sin
+colocar una orden:
+
+```rust
+use cripsy_binary_api::domain::OptionType;
+
+let quote = broker
+    .quote_payout("USDZAR-OTC", OptionType::Digital, 60, 1.0)
+    .await?;
+if quote.available {
+    println!("{:?} %", quote.profit_percent);
+} else {
+    println!("el bróker no publicó esa cotización");
+}
+```
+
+La consulta toma `call.bid` del strike `SPT` y espera como máximo 15 s. Si no
+llega el periodo, devuelve `available: false`; no se reutiliza el payout del
+catálogo. `amount` no cambia el precio digital de IQ y se conserva por
+contrato. La referencia es `CALL`: no se asume que `PUT` pague lo mismo.
+Binaria, turbo y blitz no tienen un canal equivalente y también devuelven
+`available: false`.
 
 ## Resultado
 

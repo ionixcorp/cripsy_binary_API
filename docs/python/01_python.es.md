@@ -18,9 +18,9 @@ gana dependencias**: `cargo add cripsy-binary-api` sigue igual.
 
 | Canal | Estado |
 |---|---|
-| crates.io (`cripsy-binary-api` 0.3.1) | Publicado y verificado |
+| crates.io (`cripsy-binary-api` 0.3.2) | Publicado y verificado; el binding Python sigue en 0.3.1 |
 | GitHub Release `v0.3.1` | Wheels Linux x64/arm64, Windows x64/arm64, macOS Intel/arm64 y sdist |
-| PyPI | Publicado y verificado: seis wheels y sdist |
+| PyPI (`cripsy-binary-api` 0.3.1) | Publicado y verificado: seis wheels y sdist |
 
 El wheel es `abi3` para CPython 3.10 o superior. El paquete ya está en PyPI;
 también puedes instalar el wheel del release o compilar desde el repositorio.
@@ -121,7 +121,7 @@ finally:
 | `assets()` | lista de dicts | catálogo completo |
 | `candles(symbol, interval, count)` | lista de dicts | `interval` en segundos |
 | `asset_status(symbol)` | str | `Open` / `Closed` / `Suspended` |
-| `payout(symbol, seconds)` | dict | payout del catálogo |
+| `payout(symbol, seconds)` | dict | payout del catálogo; no cotización por expiración |
 | `session()` / `balance()` | dict | requieren cuenta |
 | `history(limit, offset, symbol)` | dict | posiciones cerradas |
 | `ticks(symbol, seconds)` | lista de dicts | stream nativo, sin polling |
@@ -143,6 +143,9 @@ Los dicts conservan los nombres del dominio Rust (`symbol`, `close`,
   libera durante la espera. Para concurrencia, usa un `Client` por hilo.
 - **Digital, blitz e indicadores solo en IQ Option.** El binding los expone y
   Deriv los rechaza con `CripsyError`; no se simulan sobre rise/fall.
+- **Sin `quote_payout` en Python.** El binding 0.3.1 expone `payout` del
+  catálogo; la cotización por expiración de 0.3.2 es solo Rust por ahora. No se
+  simula en Python.
 - **Sin `asyncio`.** No hay `await` en Python todavía; el núcleo async se usa
   internamente.
 - **Una sesión por `Client`.** `close()` es obligatorio para liberar el socket.

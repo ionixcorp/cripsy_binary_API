@@ -19,7 +19,7 @@ pub use operation::{
     BuyBinaryRequest, BuyBlitzRequest, BuyDigitalRequest, Direction, Operation, OperationResult,
     OperationStatus, OptionType, OrderId, RolloverParams,
 };
-pub use payout::{Payout, StrikeList, StrikeQuote};
+pub use payout::{Payout, PayoutQuote, StrikeList, StrikeQuote};
 pub use platform::{
     AssetProfile, CommissionChange, FinancialInfo, LeaderboardEntry, LiveDeal, TechnicalIndicators,
     TopAsset,

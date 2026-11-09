@@ -22,6 +22,10 @@ del bróker nunca provoca el reenvío de una orden.
 | Live deals y comisiones | no ofrecidos |
 | Fachada sincrónica `SyncBroker` | exclusiva de IQ Option |
 
+`quote_payout` es una consulta de lectura: para digital y Blitz devuelve
+`available: false` en lugar de un error. La compra de esos productos sigue
+rechazada.
+
 `SyncBroker` no se extiende a Deriv: existe para consumidores heredados de IQ
 Option y Deriv mantiene la API async. No es una limitación pendiente, es una
 decisión de compatibilidad.

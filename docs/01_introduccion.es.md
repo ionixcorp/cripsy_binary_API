@@ -36,6 +36,7 @@ opciones binarias. Diseñada desde cero, con estas propiedades:
 | Historial de posiciones | Listo, verificado (PnL realizado) |
 | Live-deals y comisiones | Suscripción lista; el volumen de eventos depende del bróker |
 | Resultados por evento y caché | Listo, verificado en cuenta demo |
+| Cotización por expiración (`quote_payout`) | Digital verificada; binaria, turbo y blitz devuelven no disponible |
 | Fachada sincrónica (`SyncBroker`) | Lista, verificada contra el bróker |
 | Indicadores técnicos del bróker | Canal implementado; el bróker rechaza hoy todos los activos |
 
@@ -44,6 +45,7 @@ opciones binarias. Diseñada desde cero, con estas propiedades:
 | Componente | Estado |
 |---|---|
 | Modo público (sin credenciales) | Listo, verificado: catálogo, velas, payout y ticks |
+| Cotización por expiración (`quote_payout`) | Rise/fall verificada; digital devuelve no disponible |
 | Sesión autenticada (OTP + App ID) | Lista, verificada en cuenta demo |
 | Compra y venta rise/fall | Listas, verificadas en cuenta demo |
 | Cierre por evento e historial | Listos, verificados (`profit_table` paginado) |
@@ -101,9 +103,13 @@ Todas las llamadas del trait `Broker` son `async` y devuelven
 - **Resultado de operación desde caché**: `get_operation_result` lee la caché
   alimentada por eventos; no consulta al bróker. Sin el stream activo, una orden
   puede quedarse en `Pending`.
-- **Payout del catálogo**: `get_payout` devuelve el payout publicado para el
-  activo; el parámetro de expiración no cambia la consulta. Los cambios en vivo
-  llegan por `Event::PayoutChanged`.
+- **Payout del catálogo y cotización**: `get_payout` devuelve el payout
+  publicado para el activo; el parámetro de expiración no cambia la consulta.
+  Para una combinación concreta, `quote_payout` consulta una cotización por
+  expiración y tipo. Si el bróker no la ofrece, devuelve `available: false` con
+  `profit_percent: None`; no se inventa un porcentaje. La referencia actual es
+  `CALL` y no se asume simetría con `PUT`. Los cambios en vivo de payout llegan
+  por `Event::PayoutChanged`.
 - **Suscripciones sin baja explícita**: al soltar el `CandleStream` la
   suscripción se retira en el siguiente despacho de velas.
 - **Pérdida de eventos**: si el consumidor se atrasa más que el buffer (1024),

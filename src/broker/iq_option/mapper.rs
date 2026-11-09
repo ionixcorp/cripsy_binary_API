@@ -981,6 +981,37 @@ mod tests {
     }
 
     #[test]
+    fn payout_price_splitter_usa_spot_y_calcula_ambas_direcciones() {
+        // Payload real observado en la cuenta (2026-11-09), recortado.
+        let msg = json!({
+            "asset_id": 76,
+            "period": 60,
+            "prices": [
+                { "strike": "1.10", "call": { "bid": 70 }, "put": { "ask": 30 } },
+                { "strike": "SPT",
+                  "call": { "symbol": "do76...C...", "bid": 65 },
+                  "put": { "symbol": "do76...P...", "ask": 26.5, "bid": 0.1 } }
+            ]
+        });
+        let call = payout_price_splitter(&msg, Direction::Call).unwrap();
+        assert_eq!(call.expiration_seconds, 60);
+        assert!((call.profit_percent - (100.0 - 65.0) * 100.0 / 65.0).abs() < 1e-9);
+
+        let put = payout_price_splitter(&msg, Direction::Put).unwrap();
+        assert!((put.profit_percent - (100.0 - 26.5) * 100.0 / 26.5).abs() < 1e-9);
+    }
+
+    #[test]
+    fn payout_price_splitter_sin_precio_es_none() {
+        let msg = json!({
+            "asset_id": 76,
+            "period": 60,
+            "prices": [{ "strike": "SPT", "call": {}, "put": {} }]
+        });
+        assert!(payout_price_splitter(&msg, Direction::Call).is_none());
+    }
+
+    #[test]
     fn comision_desde_frame_extrae_valor() {
         // Forma verificada contra el bróker.
         let msg = json!({

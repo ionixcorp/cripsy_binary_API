@@ -60,7 +60,7 @@ Reglas:
 Métodos disponibles (todos bloqueantes): `session`, `is_connected`,
 `disconnect`, `get_balance`, `get_account_type`, `switch_account`,
 `list_assets`, `asset_status`, `get_candles`, `subscribe_candles`,
-`get_position_history`, `get_payout`, `get_asset_profile`,
+`get_position_history`, `get_payout`, `quote_payout`, `get_asset_profile`,
 `get_technical_indicators`, `subscribe_live_deals`,
 `subscribe_commission_changes`, `events`, `buy_binary`,
 `buy_digital_spot`, `sell_option`, `get_operation_result`.

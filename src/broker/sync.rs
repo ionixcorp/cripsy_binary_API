@@ -117,6 +117,22 @@ impl SyncBroker {
             .block_on(self.nucleo.get_payout(symbol, expiration_seconds))
     }
 
+    /// Cotización por expiración y tipo de opción.
+    pub fn quote_payout(
+        &self,
+        symbol: &str,
+        option_type: OptionType,
+        expiration_seconds: u64,
+        amount: f64,
+    ) -> Result<PayoutQuote, BrokerError> {
+        self.runtime.block_on(self.nucleo.quote_payout(
+            symbol,
+            option_type,
+            expiration_seconds,
+            amount,
+        ))
+    }
+
     pub fn get_asset_profile(&self, symbol: &str) -> Result<AssetProfile, BrokerError> {
         self.runtime.block_on(self.nucleo.get_asset_profile(symbol))
     }
