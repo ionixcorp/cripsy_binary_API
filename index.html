@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cripsy_binary_API — Documentación</title>
+<meta name="description" content="Documentación de cripsy_binary_API: cliente Rust para la API de IQ Option.">
+<style>
+:root { --bg:#0b0e14; --panel:#11151f; --panel2:#151b28; --borde:#1f2736; --texto:#dde3ee; --suave:#8d97a8; --acento:#6aa8ff; --codigo:#0a0d13; }
+*, *::before, *::after { box-sizing:border-box; }
+html { scroll-behavior:smooth; }
+body { margin:0; background:var(--bg); color:var(--texto); font-family:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",sans-serif; font-size:15px; line-height:1.6; display:grid; grid-template-columns:296px minmax(0,1fr) 264px; grid-template-rows:56px 1fr auto; min-height:100vh; }
+header.topbar { grid-column:1 / -1; display:flex; align-items:center; gap:14px; padding:0 22px; background:linear-gradient(180deg,#121826,#0e131d); border-bottom:1px solid var(--borde); position:sticky; top:0; z-index:20; }
+.marca { display:flex; align-items:center; gap:9px; font-weight:600; letter-spacing:.2px; color:var(--texto); text-decoration:none; }
+.marca .punto { width:9px; height:9px; border-radius:50%; background:var(--acento); box-shadow:0 0 12px var(--acento); }
+.marca .ver { font-size:11px; font-weight:500; color:var(--suave); border:1px solid var(--borde); border-radius:999px; padding:1px 8px; }
+header.topbar .sep { flex:1; }
+header.topbar a.enlace { font-size:13px; color:var(--suave); text-decoration:none; padding:6px 10px; border-radius:8px; }
+header.topbar a.enlace:hover { color:var(--texto); background:#1a2130; }
+#menu-movil { display:none; }
+nav { grid-column:1; grid-row:2 / span 2; background:var(--panel); border-right:1px solid var(--borde); padding:18px 14px 28px; position:sticky; top:56px; align-self:start; height:calc(100vh - 56px); overflow-y:auto; }
+nav .rotulo { font-size:11px; text-transform:uppercase; letter-spacing:.1em; color:var(--suave); margin:0 0 10px 4px; }
+#buscador { width:100%; padding:9px 11px; border-radius:9px; border:1px solid var(--borde); background:var(--codigo); color:var(--texto); margin-bottom:14px; }
+#buscador:focus { outline:none; border-color:var(--acento); box-shadow:0 0 0 3px rgba(106,168,255,.15); }
+.nav-grupo { margin-bottom:16px; }
+.nav-titulo { font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--suave); margin:8px 0 6px 4px; }
+.nav-item { display:block; padding:7px 10px; border-radius:8px; color:#c3cbd9; text-decoration:none; font-size:13.5px; border-left:2px solid transparent; }
+.nav-item:hover { background:var(--panel2); color:var(--texto); }
+.nav-item.activo { background:#1b2740; color:var(--acento); border-left-color:var(--acento); }
+main { grid-column:2; padding:34px 46px 64px; max-width:900px; }
+.pagina { display:none; }
+.pagina.activa { display:block; animation:aparece .18s ease-out; }
+@keyframes aparece { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
+h1.titulo-pagina { font-size:28px; line-height:1.25; margin:0 0 22px; padding-bottom:14px; border-bottom:1px solid var(--borde); }
+h2 { font-size:20px; margin:32px 0 12px; scroll-margin-top:72px; }
+h3 { font-size:16.5px; margin:24px 0 10px; color:#e8edf7; scroll-margin-top:72px; }
+p, li { font-size:14.5px; color:#cfd6e4; }
+blockquote { border-left:3px solid var(--acento); background:#0f1622; margin:16px 0; padding:10px 16px; border-radius:0 8px 8px 0; color:#b9c2d2; }
+pre.code { background:var(--codigo); border:1px solid var(--borde); border-left:3px solid #2f57a0; border-radius:10px; padding:14px 16px; overflow-x:auto; font-size:13px; line-height:1.55; }
+code { font-family:"Cascadia Code",Consolas,"SF Mono",monospace; background:#161d2b; border:1px solid #222c3d; border-radius:5px; padding:1px 5px; font-size:12.8px; }
+pre code { background:none; border:none; padding:0; }
+table { border-collapse:separate; border-spacing:0; margin:16px 0; width:100%; font-size:13.5px; border:1px solid var(--borde); border-radius:10px; overflow:hidden; }
+th, td { padding:9px 12px; text-align:left; border-bottom:1px solid var(--borde); vertical-align:top; }
+th { background:#161d2b; color:#e8edf7; font-weight:600; }
+tr:last-child td { border-bottom:none; }
+table tr:nth-child(even) td { background:#0e141f; }
+a { color:var(--acento); text-decoration:none; }
+a:hover { text-decoration:underline; }
+hr { border:none; border-top:1px solid var(--borde); margin:26px 0; }
+aside.toc { grid-column:3; grid-row:2; position:sticky; top:56px; align-self:start; height:calc(100vh - 56px); overflow-y:auto; padding:26px 18px 40px; border-left:1px solid var(--borde); background:rgba(17,21,31,.55); }
+.toc-titulo { font-size:11px; text-transform:uppercase; letter-spacing:.1em; color:var(--suave); margin:0 0 10px; }
+#toc a { display:block; padding:5px 0 5px 12px; color:#a9b3c4; font-size:13px; border-left:2px solid var(--borde); }
+#toc a:hover { color:var(--texto); border-left-color:var(--acento); text-decoration:none; }
+#toc a.toc-3 { padding-left:24px; font-size:12.5px; color:#8d97a8; }
+.toc-vacio { font-size:13px; color:var(--suave); }
+.toc-bloque { margin-top:26px; padding-top:18px; border-top:1px solid var(--borde); }
+.toc-bloque a { display:block; font-size:13px; color:#a9b3c4; padding:4px 0; }
+footer { grid-column:1 / -1; display:flex; gap:18px; flex-wrap:wrap; align-items:center; padding:18px 22px; border-top:1px solid var(--borde); background:var(--panel); color:var(--suave); font-size:12.5px; }
+footer a { color:var(--suave); }
+footer code { font-size:12px; }
+@media (max-width:1120px) { body { grid-template-columns:1fr; } nav, aside.toc { display:none; } main { grid-column:1; padding:24px 20px 48px; } header.topbar { padding:0 14px; } #menu-movil { display:block; flex:1; max-width:320px; padding:7px 10px; border-radius:8px; border:1px solid var(--borde); background:var(--codigo); color:var(--texto); } header.topbar a.enlace { display:none; } }
+@media print { nav, aside.toc, header.topbar, footer { display:none; } main { max-width:none; } }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <a class="marca" href="#.-01_introduccion"><span class="punto"></span>cripsy_binary_API <span class="ver">v0.2.1</span></a>
+  <select id="menu-movil" aria-label="Ir a una pagina"></select>
+  <span class="sep"></span>
+  <a class="enlace" href="https://github.com/ionixcorp/cripsy_binary_API">Repositorio</a>
+  <a class="enlace" href="https://github.com/ionixcorp/cripsy_binary_API/tree/master/docs">Markdown</a>
+</header>
+<nav>
+  <div class="rotulo">Documentación</div>
+  <input id="buscador" type="search" placeholder="Buscar…" aria-label="Buscar en la documentacion">
+  <div id="nav"><div class="nav-grupo"><div class="nav-titulo">Introduccion.es.md</div><a class="nav-item" href="#.-01_introduccion" data-id=".-01_introduccion">Qué es cripsy_binary_API</a></div><div class="nav-grupo"><div class="nav-titulo">Account</div><a class="nav-item" href="#.-02_account-01_sesion_cuentas" data-id=".-02_account-01_sesion_cuentas">Sesión y cuentas</a></div><div class="nav-grupo"><div class="nav-titulo">Candle And Stream</div><a class="nav-item" href="#.-03_candle_and_stream-01_historicos" data-id=".-03_candle_and_stream-01_historicos">Históricos: límites verificados</a><a class="nav-item" href="#.-03_candle_and_stream-02_stream_ticks" data-id=".-03_candle_and_stream-02_stream_ticks">Stream en vivo: velas multi-tamaño y ticks</a><a class="nav-item" href="#.-03_candle_and_stream-03_fachada_sincrona" data-id=".-03_candle_and_stream-03_fachada_sincrona">Fachada sincrónica e histórico</a></div><div class="nav-grupo"><div class="nav-titulo">Digital</div><a class="nav-item" href="#.-04_digital-01_digital" data-id=".-04_digital-01_digital">Opciones digitales</a></div><div class="nav-grupo"><div class="nav-titulo">Binary</div><a class="nav-item" href="#.-05_binary-01_binary" data-id=".-05_binary-01_binary">Opciones clásicas (turbo / binary)</a></div><div class="nav-grupo"><div class="nav-titulo">Blitz</div><a class="nav-item" href="#.-06_blitz-01_blitz" data-id=".-06_blitz-01_blitz">Opciones blitz</a></div><div class="nav-grupo"><div class="nav-titulo">Herramientas</div><a class="nav-item" href="#.-07_herramientas-01_herramientas" data-id=".-07_herramientas-01_herramientas">Herramientas del proyecto</a></div><div class="nav-grupo"><div class="nav-titulo">Indicadores</div><a class="nav-item" href="#.-08_indicadores-01_indicadores" data-id=".-08_indicadores-01_indicadores">Indicadores técnicos del bróker</a></div><div class="nav-grupo"><div class="nav-titulo">Reconexion</div><a class="nav-item" href="#.-09_reconexion-01_reconexion" data-id=".-09_reconexion-01_reconexion">Reconexión de sesión</a></div></div>
+</nav>
+<main id="contenido"><section class="pagina" id=".-01_introduccion"><h1 class="titulo-pagina">Qué es cripsy_binary_API</h1><h1>Qué es cripsy_binary_API</h1><p><code>cripsy_binary_API</code> es una API moderna, en Rust, para operar contra brókers de</p><p>opciones binarias. Diseñada desde cero, con estas propiedades:</p><ul><li><strong>Núcleo asíncrono</strong>: el adaptador es <code>async</code>/<code>await</code> nativo.</li><li><strong>Fachada sincrónica</strong>: <code>broker::sync::SyncBroker</code> permite consumir la misma</li></ul><p>API con llamadas bloqueantes, sin tokio ni <code>await</code>.</p><ul><li><strong>Sin estado global estático y sin polling</strong>: cada petición crea un canal y la</li></ul><p>respuesta se correlaciona por <code>request_id</code>; los resultados de las órdenes</p><p>llegan por eventos.</p><ul><li><strong>Multibróker</strong>: una interfaz común (<code>Broker</code>) con adaptadores por bróker;</li></ul><p>el primero es IQ Option.</p><ul><li><strong>Streams nativos de alta densidad</strong>: ~3 ticks de precio por segundo por</li></ul><p>activo en la medición documentada; hasta 75 activos por sesión sin rechazos.</p><ul><li><strong>Tipado de extremo a extremo</strong>: nada de diccionarios crudos en la frontera</li></ul><p>pública.</p><h2 id="s1-estado-actual">Estado actual</h2><table><tr><th>Componente</th><th>Estado</th></tr><tr><td>Autenticación y sesión (login + WSS + perfil)</td><td>Listo, verificado contra el bróker</td></tr><tr><td>Catálogo de activos (binary, turbo y blitz)</td><td>Listo, verificado contra el bróker</td></tr><tr><td>Velas históricas (hasta 1s × 7 días)</td><td>Listo, verificado contra el bróker</td></tr><tr><td>Stream de velas multi-tamaño y ticks</td><td>Listo, verificado contra el bróker</td></tr><tr><td>Órdenes clásicas (turbo/binary)</td><td>Listo, verificado en cuenta demo</td></tr><tr><td>Órdenes digitales (protocolo v2)</td><td>Listo, verificado en cuenta demo</td></tr><tr><td>Órdenes blitz (protocolo v2)</td><td>Listo, verificado en cuenta demo (apertura + cierre por evento)</td></tr><tr><td>Venta anticipada (buyback)</td><td>Lista, verificada en cuenta demo</td></tr><tr><td>Perfil fundamental del activo</td><td>Listo, verificado contra el bróker</td></tr><tr><td>Historial de posiciones</td><td>Listo, verificado (PnL realizado)</td></tr><tr><td>Live-deals y comisiones</td><td>Suscripción lista; el volumen de eventos depende del bróker</td></tr><tr><td>Resultados por evento y caché</td><td>Listo, verificado en cuenta demo</td></tr><tr><td>Fachada sincrónica (<code>SyncBroker</code>)</td><td>Lista, verificada contra el bróker</td></tr><tr><td>Indicadores técnicos del bróker</td><td>Canal implementado; el bróker rechaza hoy todos los activos</td></tr></table><h2 id="s2-qué-no-hace">Qué no hace</h2><ul><li><strong>No calcula indicadores</strong>: entrega los que el bróker publique, o nada si el</li></ul><p>bróker no los soporta. Puedes calcular los tuyos con el histórico y el stream.</p><ul><li><strong>No es una interfaz gráfica ni un bot</strong>: es una librería para que tú</li></ul><p>construyas encima.</p><ul><li><strong>No gestiona tu dinero</strong>: envía órdenes al bróker cuando se lo pides.</li></ul><h2 id="s3-cómo-leer-esta-documentación">Cómo leer esta documentación</h2><p>Todas las llamadas del trait <code>Broker</code> son <code>async</code> y devuelven</p><p><code>Result&lt;_, BrokerError&gt;</code> (salvo <code>name()</code> e <code>is_connected()</code>).</p><table><tr><th>Sección</th><th>Contenido</th></tr><tr><td>02 · Account</td><td>Conexión, cuentas (demo/real), balances</td></tr><tr><td>03 · Candle &amp; Stream</td><td>Históricos, límites, velas en vivo, ticks y fachada sincrónica</td></tr><tr><td>04 · Digital</td><td>Compra digital v2 y ciclo de vida</td></tr><tr><td>05 · Binary</td><td>Órdenes clásicas turbo/binary</td></tr><tr><td>06 · Blitz</td><td>Órdenes blitz y rollovers</td></tr><tr><td>07 · Herramientas</td><td>Instalación, verificación y cómo añadir otro bróker</td></tr><tr><td>08 · Indicadores</td><td>Indicadores del bróker: estado y alternativas</td></tr><tr><td>09 · Reconexión</td><td>Supervisión de sesión, replay de suscripciones y límites</td></tr></table><h2 id="s4-requisitos">Requisitos</h2><ul><li>Rust 1.86 o superior (<code>rustup</code>).</li><li>Credenciales del bróker (se recomienda cuenta demo para empezar).</li><li>Windows, Linux o macOS.</li></ul><h2 id="s5-limitaciones-conocidas">Limitaciones conocidas</h2><ul><li><strong>Reconexión automática (0.2.0)</strong>: si el WebSocket cae, la sesión</li></ul><p>reautentica, restaura perfil, catálogo y suscripciones, y lo informa con</p><p><code>Event::Disconnected</code> y <code>Event::Reconnected { intentos, downtime_ms }</code>.</p><p>Mientras no hay socket, las llamadas devuelven <code>BrokerError::NotConnected</code>.</p><ul><li><strong>Órdenes en vuelo</strong>: se descartan con error y no se reenvían al reconectar;</li></ul><p>reenviarlas significaría operar con un mercado distinto al decidido.</p><ul><li><strong>Huecos de stream</strong>: la reproducción restablece las suscripciones, pero los</li></ul><p>datos ocurridos durante la caída se recuperan con el histórico, no por el</p><p>stream.</p><ul><li><strong>Resultado de operación desde caché</strong>: <code>get_operation_result</code> lee la caché</li></ul><p>alimentada por eventos; no consulta al bróker. Sin el stream activo, una orden</p><p>puede quedarse en <code>Pending</code>.</p><ul><li><strong>Payout del catálogo</strong>: <code>get_payout</code> devuelve el payout publicado para el</li></ul><p>activo; el parámetro de expiración no cambia la consulta. Los cambios en vivo</p><p>llegan por <code>Event::PayoutChanged</code>.</p><ul><li><strong>Suscripciones sin baja explícita</strong>: al soltar el <code>CandleStream</code> la</li></ul><p>suscripción se retira en el siguiente despacho de velas.</p><ul><li><strong>Pérdida de eventos</strong>: si el consumidor se atrasa más que el buffer (1024),</li></ul><p>el stream entrega <code>Event::EventsLost { count }</code> y continúa.</p><ul><li><strong>Indicadores técnicos</strong>: dependen de lo que el bróker publique para cada</li></ul><p>activo; hoy los rechaza para los activos probados.</p></section><section class="pagina" id=".-02_account-01_sesion_cuentas"><h1 class="titulo-pagina">Sesión y cuentas</h1><h1>Sesión y cuentas</h1><h2 id="s1-conectar">Conectar</h2><p>La conexión combina un login HTTP y un WebSocket:</p><ol><li><code>POST https://auth.iqoption.com/api/v2/login</code> con <code>{identifier, password}</code>.</li></ol><p>La respuesta trae la cookie <code>ssid</code> (también en el cuerpo).</p><ol><li>Se abre <code>wss://iqoption.com/echo/websocket</code> y se envía</li></ol><p><code>{&quot;name&quot;:&quot;ssid&quot;,&quot;msg&quot;:&quot;&lt;SSID&gt;&quot;}</code> como primer mensaje.</p><ol><li>El bróker responde con <code>profile</code>, que incluye los balances y el</li></ol><p><code>balance_id</code> activo.</p><p>La sesión queda operativa cuando el catálogo de activos se ha recibido</p><p>(<code>get-initialization-data</code> v3.0).</p><h2 id="s2-cuentas-demo-y-real">Cuentas: demo y real</h2><p>El perfil contiene varias cuentas. El tipo se identifica por <code>balance.type</code>:</p><table><tr><th><code>type</code></th><th>Cuenta</th></tr><tr><td>1</td><td>Real</td></tr><tr><td>4</td><td>Demo (practica)</td></tr><tr><td>otros</td><td>tratados como real</td></tr></table><p>Al conectar puedes elegir la cuenta con <code>AccountSelection</code>:</p><pre class="code"><code class="lang-rust">let config = IqOptionConfig {
+    email: std::env::var(&quot;IQOPTION_EMAIL&quot;)?,
+    password: std::env::var(&quot;IQOPTION_PASSWORD&quot;)?,
+    account: AccountSelection::Practice,  // demo explícita
+    ..IqOptionConfig::default()
+};
+
+let broker = IqOptionBroker::nuevo(BrokerParams::IqOption(config)).await?;
+</code></pre><h2 id="s3-consultas-disponibles">Consultas disponibles</h2><p>Todas son <code>async</code> y devuelven <code>Result&lt;_, BrokerError&gt;</code>:</p><table><tr><th>Llamada</th><th>Qué devuelve</th></tr><tr><td><code>session().await?</code></td><td>Copia de la sesión activa (<code>balance_id</code>, tipo de cuenta, offset de hora)</td></tr><tr><td><code>get_balance().await?</code></td><td>Monto, moneda y tipo de la cuenta activa</td></tr><tr><td><code>get_account_type().await?</code></td><td><code>Practice</code> o <code>Real</code></td></tr><tr><td><code>switch_account(kind).await?</code></td><td>Cambia a demo/real (<code>api_profile_changebalance</code>)</td></tr><tr><td><code>list_assets().await?</code></td><td>Todos los activos del catálogo</td></tr><tr><td><code>asset_status(symbol).await?</code></td><td><code>Open</code> / <code>Closed</code> / <code>Suspended</code> según el bróker</td></tr></table><p>Nota sobre el catálogo: el bróker publica el mismo símbolo en hasta tres grupos</p><p>(binary, turbo y blitz) con <strong>metadatos distintos</strong> entre ellos. El catálogo</p><p>contiene una entrada por grupo; para operar blitz usa la de</p><p><code>AssetClass::Blitz</code> (ver la sección 06).</p><h2 id="s4-notas-importantes">Notas importantes</h2><ul><li>Toda orden lleva <code>user_balance_id</code>: sin cuenta activa el bróker la rechaza.</li><li>La expiración se calcula con la <strong>hora del servidor</strong> (<code>timeSync</code>), no con el</li></ul><p>reloj local.</p><ul><li>Las cuentas demo tienen saldo independiente; las operaciones de prueba se ven</li></ul><p>solo cuando la demo es la cuenta activa.</p><h2 id="s5-eventos-de-comisiones-y-operaciones-de-terceros">Eventos de comisiones y operaciones de terceros</h2><p>Dos canales más, ambos con suscripción explícita (los eventos salen por</p><p><code>broker.events()</code>):</p><pre class="code"><code class="lang-rust">// Comisiones por tipo de instrumento (binary-option, turbo-option, digital-option)
+broker.subscribe_commission_changes().await?;
+while let Some(ev) = broker.events().await?.next().await {
+    if let Event::CommissionChanged(c) = ev {
+        // c.symbol, c.instrument_type, c.commission_value
+    }
+}
+
+// Operaciones de terceros (live-deal) para un activo concreto
+broker.subscribe_live_deals(&quot;EURUSD-OTC&quot;).await?;
+while let Some(ev) = broker.events().await?.next().await {
+    if let Event::LiveDeal(deal) = ev {
+        // deal.symbol, deal.direction, deal.amount, deal.created_at
+    }
+}
+</code></pre><ul><li><code>commission-changed</code> emite <code>Event::CommissionChanged</code> con la comisión en</li></ul><p>puntos (payout = 100 − comisión).</p><ul><li><code>live-deal</code> / <code>live-deal-binary-option-placed</code> emiten <code>Event::LiveDeal</code></li></ul><p>(operaciones de otros usuarios: señal de flujo del mercado).</p><ul><li>El volumen depende de la actividad del bróker: en horarios tranquilos puede</li></ul><p>no llegar nada (verificado en vivo: suscripción aceptada, 0 eventos en</p><p>ventana de fin de semana).</p></section><section class="pagina" id=".-03_candle_and_stream-01_historicos"><h1 class="titulo-pagina">Históricos: límites verificados</h1><h1>Históricos: límites verificados</h1><p>Los datos históricos se piden con <code>get_candles(...)</code>. Los límites están</p><p><strong>verificados en vivo</strong> contra el bróker (2026-10-27):</p><table><tr><th>Tamaño de vela</th><th>Profundidad máxima</th></tr><tr><td>1 segundo</td><td><strong>7 días exactos</strong> (a 14 días: 0 velas)</td></tr><tr><td>1 minuto</td><td>entre 45 y 90 días</td></tr><tr><td>5 minutos</td><td>entre 270 y 330 días</td></tr><tr><td>15 min, 1 h, 4 h, 1 día</td><td><strong>más de 2 años</strong></td></tr></table><p>Reglas prácticas:</p><ul><li><code>count</code> máximo por petición: <strong>1000 velas</strong> (pedir más devuelve 1000).</li><li><code>to</code> debe ser el <strong>inicio de una vela ya cerrada</strong>. Usa el ayudante</li></ul><p><code>broker::historico::ultimo_cierre(ahora, intervalo)</code>, que resta un paso al</p><p>múltiplo del intervalo; con <code>to</code> dentro de la vela en curso la respuesta llega</p><p>vacía.</p><ul><li>Los datos son contiguos: sin huecos dentro de la ventana disponible.</li></ul><p>Tamaños disponibles: 1, 5, 15, 30, 60, 300, 900, 3600, 14400 y 86400 s.</p><h2 id="s1-descargar-toda-la-semana-en-velas-de-1-s">Descargar toda la semana en velas de 1 s</h2><p>Iterando <code>end_time</code> hacia atrás, <code>count × interval</code> segundos por petición:</p><pre class="code"><code class="lang-rust">let mut fin = None;
+loop {
+    let velas = broker.get_candles(CandleRequest {
+        symbol: &quot;USDZAR-OTC&quot;.into(),
+        interval: 1,
+        count: 1000,
+        end_time: fin,
+    }).await?;
+    if velas.is_empty() { break; }
+    fin = Some(velas.last().unwrap().from);
+    // ~605 peticiones cubren los 7 días completos de este activo
+}
+</code></pre><p>El protocolo también permite paginar por id (<code>to_id</code>), pero <strong>nuestra API aún</strong></p><p>no lo expone<strong>: la descarga se hace iterando <code>end_time</code> hacia atrás.</strong></p><h2 id="s2-nota-sobre-densidad-en-histórico">Nota sobre densidad en histórico</h2><p>El histórico es de velas: <strong>no existe densidad de tick en el pasado</strong>. La</p><p>granularidad fina máxima es la vela de 1 segundo. Para densidad intrasegundo</p><p>hay que usar el stream en vivo (ver la próxima página).</p></section><section class="pagina" id=".-03_candle_and_stream-02_stream_ticks"><h1 class="titulo-pagina">Stream en vivo: velas multi-tamaño y ticks</h1><h1>Stream en vivo: velas multi-tamaño y ticks</h1><p>Dos mecanismos nativos, sin polling:</p><h2 id="s1-1-velas-en-vivo-subscribe-candles">1. Velas en vivo (<code>subscribe_candles</code>)</h2><p>Una única suscripción entrega <strong>todos los tamaños</strong> de vela de un activo</p><p>(1 s, 5 s, 1 m, 5 m, ... hasta diario). El adaptador filtra por el tamaño</p><p>pedido: <code>interval = 0</code> significa "todos los tamaños".</p><pre class="code"><code class="lang-rust">let mut stream = broker.subscribe_candles(CandleSubscribe {
+    symbol: &quot;USDZAR-OTC&quot;.into(),
+    interval: 60,           // velas de 1 minuto
+}).await?;
+
+while let Some(vela) = stream.next().await {
+    let vela = vela?;       // Candle { from, to, open, close, high, low, volume }
+    // estrategia...
+}
+</code></pre><h2 id="s2-2-ticks-de-precio-event-pricetick">2. Ticks de precio (<code>Event::PriceTick</code>)</h2><p>Cada mensaje del stream trae el precio spot (<code>value</code>, <code>bid</code>, <code>ask</code>) con marca</p><p>temporal en nanosegundos. La sesión lo emite como evento:</p><pre class="code"><code class="lang-rust">let mut eventos = broker.events().await?;
+while let Some(ev) = eventos.next().await {
+    if let Event::PriceTick { symbol, tick } = ev {
+        // tick.price, tick.bid, tick.ask, tick.at_ms
+    }
+}
+</code></pre><p>El bus de eventos tiene buffer acotado (1024 eventos). Si tu consumidor se</p><p>atrasa más que el buffer, se descartan los eventos intermedios y el stream</p><p>entrega <code>Event::EventsLost { count }</code> con la cuenta de los perdidos; el stream</p><p>sigue abierto. Consume sin bloqueos largos entre lectura y lectura.</p><p>Medido en vivo (2026-10-27, varios mercados OTC):</p><table><tr><th>Activo (mercado)</th><th>Mensajes/s</th><th>Cambios de precio/s</th></tr><tr><td>XAUUSD-OTC (materia prima)</td><td>3.67</td><td>3.20</td></tr><tr><td>ETHUSD-OTC (cripto)</td><td>3.40</td><td>2.80</td></tr><tr><td>EURUSD-OTC (forex)</td><td>3.20</td><td>2.67</td></tr></table><p>Hallazgos clave:</p><ul><li>La densidad (~3/s por activo) <strong>no depende</strong> de suscribir multi-tamaño o un</li></ul><p>tamaño específico: da igual.</p><ul><li><strong>Caudal proporcional al número de activos</strong>: con 20 activos suscritos se</li></ul><p>midieron 61 mensajes/s (3.07 por activo).</p><ul><li>Escala verificada hasta <strong>75 activos en una sola sesión</strong>: 0 rechazos,</li></ul><ol><li>No se probó por encima de esa</li></ol><p>cifra, así que no se documenta un techo.</p><ul><li>La densidad exacta depende de la liquidez y el horario del activo; los</li></ul><p>ejemplos miden mercados OTC de fin de semana.</p><h2 id="s3-sin-sondeo">Sin sondeo</h2><p>Cada mensaje del WebSocket se procesa al instante y se emite como evento: no</p><p>hay bucles de consulta ni latencia artificial añadida. La densidad que mides es</p><p>la que el bróker publica.</p></section><section class="pagina" id=".-03_candle_and_stream-03_fachada_sincrona"><h1 class="titulo-pagina">Fachada sincrónica e histórico</h1><h1>Fachada sincrónica e histórico</h1><p>La API ofrece el mismo núcleo de dos formas. Si tu proyecto no es async, usa la</p><p>fachada bloqueante: <strong>no necesitas tokio ni <code>await</code></strong>.</p><h2 id="s1-fachada-sincrona">Fachada sincrona</h2><pre class="code"><code class="lang-rust">use cripsy_binary_api::broker::config::{AccountSelection, BrokerParams, IqOptionConfig};
+use cripsy_binary_api::broker::sync::SyncBroker;
+
+fn main() -&gt; Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt; {
+    let cfg = IqOptionConfig {
+        email: std::env::var(&quot;IQOPTION_EMAIL&quot;)?,
+        password: std::env::var(&quot;IQOPTION_PASSWORD&quot;)?,
+        account: AccountSelection::Practice,
+        ..IqOptionConfig::default()
+    };
+
+    let mut broker = SyncBroker::connect(BrokerParams::IqOption(cfg))?;
+
+    // Todo bloqueante, misma semántica que la versión async.
+    let balance = broker.get_balance()?;
+    println!(&quot;balance: {} {}&quot;, balance.amount, balance.currency);
+
+    let activos = broker.list_assets()?;
+    let abierto = activos
+        .iter()
+        .find(|a| a.symbol.ends_with(&quot;-OTC&quot;) &amp;&amp; a.status == cripsy_binary_api::domain::MarketStatus::Open)
+        .expect(&quot;OTC abierto&quot;);
+
+    // Streams como iteradores bloqueantes.
+    let mut velas = broker.subscribe_candles(cripsy_binary_api::domain::CandleSubscribe {
+        symbol: abierto.symbol.clone(),
+        interval: 60,
+    })?;
+    if let Some(v) = velas.next() {
+        println!(&quot;vela en vivo: {:?}&quot;, v?);
+    }
+
+    let mut eventos = broker.events()?;
+    for ev in eventos.take(5) {
+        println!(&quot;evento: {ev:?}&quot;);
+    }
+
+    broker.disconnect()?;
+    Ok(())
+}
+</code></pre><p>Reglas:</p><ul><li><strong>No uses la fachada dentro de un contexto async</strong>: bloquearía el executor</li></ul><p>del llamador. En async, usa el trait <code>Broker</code> directamente.</p><ul><li>Los iteradores tienen timeout de 30 s: si no llega nada en ese plazo, el</li></ul><p>iterador se cierra (vuelve a suscribirte si lo necesitas).</p><ul><li>El bus de eventos tiene buffer acotado: un consumidor lento puede perder</li></ul><p>eventos, igual que en async.</p><p>Métodos disponibles (todos bloqueantes): <code>session</code>, <code>is_connected</code>,</p><p><code>disconnect</code>, <code>get_balance</code>, <code>get_account_type</code>, <code>switch_account</code>,</p><p><code>list_assets</code>, <code>asset_status</code>, <code>get_candles</code>, <code>subscribe_candles</code>,</p><p><code>get_position_history</code>, <code>get_payout</code>, <code>get_asset_profile</code>,</p><p><code>get_technical_indicators</code>, <code>subscribe_live_deals</code>,</p><p><code>subscribe_commission_changes</code>, <code>events</code>, <code>buy_binary</code>,</p><p><code>buy_digital_spot</code>, <code>sell_option</code>, <code>get_operation_result</code>.</p><h2 id="s2-ayudante-de-histórico">Ayudante de histórico</h2><p><code>cripsy_binary_api::broker::historico</code> facilita descargar el histórico granular</p><p>(límites verificados: 1 s × 7 días, 1000 velas por página):</p><table><tr><th>Elemento</th><th>Para qué sirve</th></tr><tr><td><code>VELAS_POR_PAGINA</code></td><td>Tamaño de página recomendado (1000)</td></tr><tr><td><code>PAGINAS_MAXIMAS</code></td><td>Techo de seguridad para no bucles infinitos (5000)</td></tr><tr><td><code>Ventana</code></td><td>Rango con <code>count</code> máximo ya contemplado</td></tr><tr><td><code>ultimo_cierre(ahora, intervalo)</code></td><td>Último cierre de vela cerrada (multiplo del intervalo)</td></tr><tr><td><code>paginas_estimadas(intervalo, desde, hasta)</code></td><td>Cuántas páginas pedirá la descarga</td></tr><tr><td><code>faltantes(velas, intervalo)</code></td><td>Huecos detectados en una página</td></tr><tr><td><code>descargar(...)</code></td><td>Descarga completa con paginación</td></tr></table><p>Ejemplo:</p><pre class="code"><code class="lang-rust">use cripsy_binary_api::broker::historico::{descargar, paginas_estimadas};
+
+// Antes de descargar, sabe cuánto costará:
+let paginas = paginas_estimadas(1, desde_epoch, hasta_epoch);
+
+// Descarga completa con paginación (devuelve una Ventana con las velas).
+let ventana = descargar(
+    &amp;broker,               // &amp;dyn Broker (async)
+    &quot;USDZAR-OTC&quot;,
+    1,                     // intervalo: 1 segundo
+    desde_epoch,           // epoch segundos
+    hasta_epoch,           // epoch segundos
+).await?;
+
+println!(&quot;{} velas en {} páginas&quot;, ventana.velas.len(), ventana.paginas);
+</code></pre><p>Con size=1 y el límite de 7 días del bróker, una semana completa de un activo</p><p>son ~605 páginas de 1000.</p></section><section class="pagina" id=".-04_digital-01_digital"><h1 class="titulo-pagina">Opciones digitales</h1><h1>Opciones digitales</h1><p>Las digitales usan el <strong>protocolo v2</strong>: la compra se arma con el instrumento</p><p>que publica el stream de precios del bróker.</p><h2 id="s1-flujo">Flujo</h2><ol><li>Suscribirse a <code>price-splitter.client-price-generated</code> (el adaptador lo hace</li></ol><p>solo al comprar).</p><ol><li>Esperar el mensaje del periodo deseado y tomar la entrada <strong>spot</strong></li></ol><p>(<code>strike == &quot;SPT&quot;</code>): de ahí salen <code>call.symbol</code> o <code>put.symbol</code> (el</p><p><code>instrument_id</code>) y el <code>instrument_index</code>.</p><ol><li>Enviar <code>digital-options.place-digital-option</code> <strong>v2.0</strong> con:</li></ol><pre class="code"><code class="lang-json">{
+  &quot;user_balance_id&quot;: &lt;id_de_tu_perfil&gt;,
+  &quot;instrument_id&quot;: &quot;do1380A20261027D002400T1MCSPT&quot;,
+  &quot;asset_id&quot;: 1380,
+  &quot;instrument_index&quot;: 4046465,
+  &quot;amount&quot;: &quot;1.0&quot;
+}
+</code></pre><p>Detalles que el bróker exige (verificados en vivo):</p><ul><li><code>amount</code> viaja como <strong>texto</strong> ("1.0"); como número responde</li></ul><p><code>INVALID_SCHEMA</code>.</p><ul><li>El <code>instrument_index</code> debe salir del <strong>mismo</strong> mensaje de precio que el</li></ul><p>instrumento: los índices rotan.</p><ul><li>Si el instrumento elegido no es el spot, el bróker responde</li></ul><p><code>bad quote</code> (status 4008).</p><h2 id="s2-llamada">Llamada</h2><pre class="code"><code class="lang-rust">let orden = broker.buy_digital_spot(BuyDigitalRequest {
+    symbol: &quot;USDZAR-OTC&quot;.into(),
+    amount: 1.0,
+    direction: Direction::Call,
+    duration_minutes: 1,
+    strike: 0.0,   // lo elige el price-splitter
+}).await?;
+</code></pre><h2 id="s3-resultado">Resultado</h2><p>Las digitales cierran por el canal de cartera <code>position-changed</code>, no por</p><p><code>option-closed</code> como el resto. El adaptador correlaciona la orden por</p><p><code>instrument_id</code> y emite <code>Event::OrderClosed</code> igual que las demás, así que el</p><p>consumidor no ve la diferencia:</p><pre class="code"><code class="lang-rust">if let Event::OrderClosed { id, result } = /* ... */ {
+    // result: Win(neto) | Loss(monto) | Equal(monto) | Pending
+}
+</code></pre><p>El resultado también queda en el cache: <code>get_operation_result(&amp;id)</code> devuelve</p><p>el mismo valor sin consultar al bróker (sin polling).</p><h2 id="s4-semántica-de-montos">Semántica de montos</h2><ul><li><code>close_profit</code> / <code>win_amount</code> son el <strong>crédito total</strong> (inversión +</li></ul><p>ganancia), no la ganancia.</p><ul><li>El adaptador ya devuelve la <strong>ganancia neta</strong> (crédito − inversión).</li><li>En <code>socket-option-closed</code> el campo <code>amount</code> viene en micro-unidades</li></ul><p>(1 000 000 = 1 USD); <code>sum</code> es la inversión legible.</p></section><section class="pagina" id=".-05_binary-01_binary"><h1 class="titulo-pagina">Opciones clásicas (turbo / binary)</h1><h1>Opciones clásicas (turbo / binary)</h1><p>Las clásicas usan el mensaje <code>binary-options.open-option</code> v1.0. La</p><p>clasificación la hace la duración, igual que la plataforma:</p><ul><li><strong>≤ 5 minutos → turbo</strong> (<code>option_type_id</code> 3).</li><li><strong>&gt; 5 minutos → binary</strong> (<code>option_type_id</code> 1).</li></ul><p>La expiración se calcula con la tabla de minutos/cuartos de hora del bróker:</p><p>la API reproduce la lógica verificada (candidatos de minuto para turbo, de</p><p>cuarto de hora con 5 minutos de margen para binary) y elige el más cercano a</p><p>la duración pedida.</p><h2 id="s1-llamada">Llamada</h2><pre class="code"><code class="lang-rust">let orden = broker.buy_binary(BuyBinaryRequest {
+    symbol: &quot;USDZAR-OTC&quot;.into(),
+    amount: 1.0,
+    direction: Direction::Put,
+    expiration_minutes: 1,
+    option_type: OptionType::Binary,
+}).await?;
+</code></pre><p>El bróker confirma con <code>buyComplete</code>; la orden queda identificada por</p><p><code>OrderId</code>.</p><h2 id="s2-ciclo-de-vida-por-eventos">Ciclo de vida por eventos</h2><p>El resultado llega por eventos, no por polling:</p><ol><li><code>option-opened</code> — apertura tipada (<code>option_type</code>, <code>option_type_id</code>, montos).</li><li><code>option-closed</code> — resultado final con <code>result</code> (win/loose/equal) y montos.</li><li><code>socket-option-closed</code> — evento equivalente con el detalle micro-unitario.</li></ol><pre class="code"><code class="lang-rust">let mut eventos = broker.events().await?;
+while let Some(ev) = eventos.next().await {
+    if let Event::OrderClosed { id, result } = ev {
+        println!(&quot;orden {id}: {result:?}&quot;);
+    }
+}
+</code></pre><p><code>get_operation_result(&amp;id)</code> consulta el cache alimentado por esos eventos</p><p>(siempre disponible, sin latencia de red).</p><h2 id="s3-validaciones-antes-de-enviar">Validaciones antes de enviar</h2><ul><li>El activo debe estar en estado <code>Open</code>; si no, error <code>MarketClosed</code>.</li><li>Se valida el monto mínimo del catálogo (<code>min_amount</code>) cuando el bróker lo</li></ul><p>publica; el máximo lo aplica el bróker (responde con su mensaje de rechazo).</p><ul><li>En blitz se valida además que la duración esté entre las admitidas por el</li></ul><p>grupo blitz (<code>expiration_times</code> ∪ <code>rollovers</code>).</p></section><section class="pagina" id=".-06_blitz-01_blitz"><h1 class="titulo-pagina">Opciones blitz</h1><h1>Opciones blitz</h1><p>Blitz es el tipo más nuevo del protocolo (<code>option_type_id</code> <strong>12</strong>, mensaje</p><p><code>binary-options.open-option</code> <strong>v2.0</strong>) y tiene sus propias reglas. Los errores</p><p>de implementación típicos se documentan aquí porque el bróker los reporta con</p><p>mensajes engañosos.</p><h2 id="s1-reglas-verificadas">Reglas verificadas</h2><ol><li><strong>El grupo blitz tiene metadatos propios.</strong> El mismo símbolo aparece en</li></ol><p>binary, turbo y blitz con duraciones distintas (binary declara</p><p><code>[900]</code>; blitz <code>[30, 45, 60, 120, 180, 300]</code>, y los rollovers añaden</p><ol><li>Resuelve el activo contra el grupo blitz (<code>AssetClass::Blitz</code>),</li></ol><p>nunca contra binary.</p><ol><li><strong><code>expired</code> debe ir alineado</strong> al múltiplo de la duración:</li></ol><p><code>(ahora_servidor / duracion + 1) * duracion</code>. Un <code>expired</code> desalineado</p><p>recibe <code>active is suspended</code> — que parece un estado del mercado pero es un</p><p>error de forma.</p><ol><li><strong><code>profit_percent</code> va como entero</strong> (el bróker rechaza "86.0").</li></ol><h2 id="s2-llamada">Llamada</h2><pre class="code"><code class="lang-rust">let orden = broker.buy_binary(BuyBinaryRequest {
+    symbol: &quot;USDZAR-OTC&quot;.into(),
+    amount: 1.0,
+    direction: Direction::Call,
+    expiration_minutes: 30,        // para blitz: SEGUNDOS (ver nota)
+    option_type: OptionType::Blitz,
+}).await?;
+</code></pre><p>Nota de nomenclatura: en <code>BuyBinaryRequest</code>, el campo <code>expiration_minutes</code></p><p>transporta <strong>segundos</strong> cuando <code>option_type</code> es <code>Blitz</code> (las duraciones del</p><p>catálogo blitz están en segundos).</p><h2 id="s3-rollovers">Rollovers</h2><p>La respuesta de apertura del bróker trae <code>rollover_params</code> (<code>deadtime</code>,</p><p><code>limit</code>, <code>offset</code>, <code>offset_from_expiration</code>, <code>amount_multiplier</code>): son los</p><p>parámetros de renovación automática que el bróker aplica a la orden. Hoy</p><p><code>buy_binary</code> devuelve solo el <code>OrderId</code>; los parámetros de rollover viajan en</p><p>la respuesta del bróker pero <strong>no se exponen aún</strong> en la API pública.</p><h2 id="s4-estado-actual">Estado actual</h2><p>Blitz está verificado <strong>de extremo a extremo en cuenta demo</strong>: apertura</p><p>(<code>status 2000</code>, <code>type: &quot;blitz&quot;</code>, respuesta con <code>rollover_params</code>) y cierre por</p><p>evento con resultado y delta de balance coincidente.</p><p>El bróker puede reportar <code>active is suspended</code> / `asset is not available at the</p><p>moment` para activos concretos: es un estado <strong>por activo</strong> que el bróker</p><p>decide (OTC blitz opera 24/7, no es cierre de mercado). Si recibes ese error,</p><p>prueba otro activo o más tarde; el mensaje de error es literalmente el del</p><p>bróker.</p><p>Si una compra blitz se rechaza, revisa antes tu petición: las causas</p><p>confirmadas fueron duración no admitida por el grupo blitz y <code>expired</code></p><p>desalineado (arriba), no el estado del mercado.</p></section><section class="pagina" id=".-07_herramientas-01_herramientas"><h1 class="titulo-pagina">Herramientas del proyecto</h1><h1>Herramientas del proyecto</h1><p>Todo lo necesario para instalar, verificar y desarrollar está en tres lugares:</p><ul><li><code>installation/</code> — instalación guiada y verificación del entorno.</li><li><code>scripts/</code> — compuerta de calidad, generación de la documentación y scripts</li></ul><p>listos para usar contra el bróker.</p><ul><li><code>examples/</code> — uso real de la API (lectura, consumo sincrónico y una orden demo).</li></ul><h2 id="s1-instalación-guiada">Instalación guiada</h2><pre class="code"><code class="lang-powershell">.\installation\install.ps1
+</code></pre><p>El instalador, <strong>pidiendo tu aprobación en cada paso</strong>:</p><ol><li>Verifica el entorno (<code>check_env.ps1</code>): Rust, cargo, git y <code>.env</code>.</li><li>Si falta una herramienta, ofrece instalarla (rustup por winget o descarga</li></ol><p>oficial) — solo si apruebas.</p><ol><li>Compila la librería en modo release, en sus dos variantes (async y blocking).</li><li>Crea <code>.env</code> a partir de <code>.env.example</code> para tus credenciales.</li><li>Genera la documentación navegable y, si lo apruebas, ejecuta</li></ol><p><code>ejemplo_lectura</code> para comprobar la conexión (solo lectura).</p><ol><li>Escribe <code>docs/site/installed.js</code> con el estado: el portal <code>index.html</code></li></ol><p>detecta la instalación por ese archivo.</p><h2 id="s2-verificación-sin-instalar">Verificación sin instalar</h2><pre class="code"><code class="lang-powershell">.\installation\check_env.ps1
+</code></pre><h2 id="s3-compuerta-de-calidad">Compuerta de calidad</h2><pre class="code"><code class="lang-powershell">.\scriptserify.ps1
+</code></pre><p>Ejecuta <code>cargo fmt --check</code>, <code>cargo clippy --all-targets -- -D warnings</code>,</p><p><code>cargo test</code>, el build de la variante <code>blocking</code> y la generación de la</p><p>documentación. Es el estándar mínimo antes de dar un cambio por bueno.</p><h2 id="s4-regenerar-la-documentación-navegable">Regenerar la documentación navegable</h2><pre class="code"><code class="lang-powershell">.\scriptsuild_docs.ps1 -Lang es
+</code></pre><p>Convierte <code>docs/**/*.es.md</code> en un único HTML navegable en <code>docs/site/es/</code>. El</p><p>punto de entrada es <code>index.html</code> en la raíz del proyecto. El Markdown es la</p><p>fuente de verdad; el HTML es generado y nunca se edita a mano.</p><p>Para leerlo: en VS Code instala la extensión <strong>Live Server</strong> (Go Live) y pulsa</p><p>*Go Live* sobre el <code>index.html</code>; o abre el archivo con doble clic, porque</p><p>funciona también sin servidor (<code>file://</code>, navegación por hash y sin <code>fetch</code>).</p><h2 id="s5-scripts-listos-para-usar">Scripts listos para usar</h2><p>Todas leen tus credenciales de <code>.env</code> y operan en cuenta <strong>demo</strong>:</p><table><tr><th>Script</th><th>Qué hace</th></tr><tr><td><code>scripts\conectar.ps1</code></td><td>Sesión, balance, catálogo, velas y stream (solo lectura)</td></tr><tr><td><code>scripts\balance.ps1</code></td><td>Balance, tipo de cuenta y <code>balance_id</code></td></tr><tr><td><code>scripts\operar.ps1</code></td><td>Orden de 1 USD en demo y cierre por evento (pide confirmación)</td></tr><tr><td><code>scripts\verificar_todo.ps1</code></td><td>Valida <strong>todas</strong> las capacidades documentadas y reporta <code>[OK]</code>/<code>[FALLO]</code></td></tr></table><pre class="code"><code class="lang-powershell">.\scripts\verificar_todo.ps1              # incluye órdenes demo
+.\scripts\verificar_todo.ps1 -SoloLectura # sin enviar órdenes
+</code></pre><h2 id="s6-probar-contra-el-bróker">Probar contra el bróker</h2><p>Los ejemplos leen las credenciales del entorno y operan en cuenta demo:</p><pre class="code"><code class="lang-powershell">cargo run --example ejemplo_lectura     # sesión, catálogo, velas y stream
+cargo run --example ejemplo_sincrono    # el mismo consumo, bloqueante
+cargo run --example ejemplo_orden_demo  # compra demo y cierre por evento
+cargo run --example verificar_todo      # verificación integral
+</code></pre><p><code>ejemplo_orden_demo</code> mueve saldo de práctica: ejecútalo solo si eres el dueño de</p><p>la cuenta o tienes autorización explícita.</p><h2 id="s7-agregar-otro-bróker">Agregar otro bróker</h2><ol><li>Crear <code>src/broker/&lt;nombre&gt;/</code> con su <code>Config</code> (añadir la variante a</li></ol><p><code>BrokerParams</code>).</p><ol><li>Implementar el trait <code>Broker</code> (async).</li><li>Escribir el mapper dominio ↔ protocolo del bróker.</li><li>Registrar en <code>BrokerRegistry</code>.</li></ol><p>No se modifica ni el dominio ni el transporte: los brókers nuevos se añaden</p><p>como adaptadores.</p><h2 id="s8-garantía-y-descargo">Garantía y descargo</h2><p>La API expone el contrato listo para mostrar desde tu código:</p><pre class="code"><code class="lang-rust">use cripsy_binary_api::{mensaje_consumidor, revisar_config};
+
+println!(&quot;{}&quot;, mensaje_consumidor());
+let reporte = revisar_config(&amp;tu_config);
+for aviso in &amp;reporte.advertencias {
+    eprintln!(&quot;aviso de uso: {aviso}&quot;);
+}
+</code></pre><p>Si sigues el flujo documentado, lo documentado funciona. Cualquier otro uso</p><p>queda fuera de la garantía: ver la sección «Garantía y descargo» del <code>README.md</code>.</p></section><section class="pagina" id=".-08_indicadores-01_indicadores"><h1 class="titulo-pagina">Indicadores técnicos del bróker</h1><h1>Indicadores técnicos del bróker</h1><h2 id="s1-la-respuesta-corta">La respuesta corta</h2><p>El bróker <strong>sí tiene un canal</strong> de indicadores técnicos, pero hoy rechaza todos</p><p>los activos. Nuestra API lo implementa igual: cuando el bróker lo habilite,</p><p>funciona sin cambios.</p><h2 id="s2-qué-se-verificó">Qué se verificó</h2><p>El canal existe y responde con mensajes tipados:</p><ul><li>Petición: <code>sendMessage</code> con <code>trading-signals.get-technical-indicators</code></li></ul><p>v1.0 y body <code>{&quot;id&quot;: &lt;active_id&gt;}</code>.</p><ul><li>Respuesta: mensaje <code>technical-indicators</code> con <code>msg.indicators</code> (forma libre</li></ul><p>del bróker) o <code>msg.message</code> de error.</p><p>Errores observados en la validación (2026-10-27):</p><table><tr><th>Prueba</th><th>Respuesta del bróker</th></tr><tr><td>Varias docenas de activos (OTC y no-OTC, abiertos y cerrados)</td><td><code>Active is not supported: active id 'X'</code> (status 4150)</td></tr><tr><td><code>id</code> como texto</td><td><code>INVALID_SCHEMA</code> (debe ser entero)</td></tr><tr><td>versión 2.0</td><td>sin respuesta</td></tr></table><p>Es decir: el canal está vivo pero el servicio no entrega indicadores a esta</p><p>cuenta/estado actual. No es un problema de formato.</p><h2 id="s3-cómo-usarlo-cuando-esté-disponible">Cómo usarlo cuando esté disponible</h2><pre class="code"><code class="lang-rust">let indicadores = broker.get_technical_indicators(&quot;EURUSD-OTC&quot;).await?;
+// indicadores.indicators trae la forma libre del bróker
+</code></pre><p>La API es de transporte: <strong>no calcula ni configura indicadores</strong>, entrega lo</p><p>que el bróker publique. Si el bróker no soporta el activo, recibes</p><p><code>BrokerError::Rejected</code> con el mensaje textual del bróker.</p><h2 id="s4-alternativa-calcular-los-tuyos">Alternativa: calcular los tuyos</h2><p>Si prefieres no depender del canal, puedes calcular indicadores a partir de:</p><ul><li><strong>Histórico</strong>: hasta 1s × 7 días por activo (ideal para backtests densos).</li><li><strong>Stream en vivo</strong>: ~3 ticks/s por activo para tiempo real.</li><li><strong>Mood y popularidad</strong>: <code>Event::TradersMoodChanged</code> y</li></ul><p><code>Event::TopAssetUpdated</code> vienen del bróker como señales adicionales.</p><p>Con velas de 1 segundo reconstruidas desde el histórico puedes alimentar</p><p>cualquier indicador (medias, RSI, bandas, pivotes) con resolución de un segundo.</p></section><section class="pagina" id=".-09_reconexion-01_reconexion"><h1 class="titulo-pagina">Reconexión de sesión</h1><h1>Reconexión de sesión</h1><p>Desde la versión 0.2.0 la sesión no se queda caída cuando el WebSocket se</p><p>interrumpe: una tarea supervisora la restablece y el consumidor recibe el aviso</p><p>por el mismo stream de eventos que ya usa.</p><h2 id="s1-qué-ocurre-cuando-cae-la-conexión">Qué ocurre cuando cae la conexión</h2><ol><li>El bucle de despacho termina y se descartan las peticiones en vuelo</li></ol><p>(<code>fail_all</code>), de modo que ninguna espera queda colgada hasta su timeout.</p><ol><li>Se emite <code>Event::Disconnected { motivo }</code> con el motivo observado: error de</li></ol><p>lectura, error de escritura o cierre por parte del bróker.</p><ol><li>La sesión vuelve a autenticarse con las credenciales de la configuración y</li></ol><p>abre un WebSocket nuevo con reintentos y backoff exponencial</p><p>(<code>backoff_base_ms</code> … <code>backoff_max_ms</code>).</p><ol><li>Con el socket nuevo se rehace el handshake: <code>ssid</code> → perfil (sesión y</li></ol><p>balances) y datos de inicialización (catálogo de activos).</p><ol><li>Se reproduce el registro de suscripciones completo.</li><li>Se emite <code>Event::Reconnected { intentos, downtime_ms }</code> y el despacho</li></ol><p>continúa.</p><p>Los streams de velas entregados antes de la caída <strong>siguen siendo válidos</strong>: no</p><p>se cierran y vuelven a recibir datos cuando la suscripción se reproduce.</p><h2 id="s2-peticiones-durante-la-caída">Peticiones durante la caída</h2><p>Mientras no hay socket, <code>solicitar</code> y las suscripciones devuelven</p><p><code>BrokerError::NotConnected</code> de inmediato. No se encola nada a propósito: una</p><p>orden guardada para más tarde se ejecutaría contra un mercado distinto del que</p><p>motivó la decisión, que en opciones binarias con expiración corta cambia el</p><p>resultado por completo.</p><p>La cola de salida está acotada (<code>TransportConfig::cola_salida</code>, 256 por</p><p>defecto). Si el productor supera esa capacidad sin que el socket consuma, la</p><p>llamada espera en lugar de crecer en memoria sin límite.</p><h2 id="s3-credenciales-rechazadas">Credenciales rechazadas</h2><p>Un fallo de autenticación es terminal: la reconexión se abandona y la sesión</p><p>queda cerrada. Reintentar el login en bucle es la forma más rápida de que el</p><p>bróker bloquee la cuenta, así que el supervisor no lo hace. Los fallos de red o</p><p>de handshake sí se reintentan.</p><h2 id="s4-personalización">Personalización</h2><pre class="code"><code class="lang-rust">use cripsy_binary_api::broker::config::{IqOptionConfig, TransportConfig};
+
+let cfg = IqOptionConfig {
+    transport: TransportConfig {
+        backoff_base_ms: 250,   // primera espera
+        backoff_max_ms: 8_000,  // techo
+        cola_salida: 256,       // capacidad de la cola de salida
+        ..TransportConfig::default()
+    },
+    ..IqOptionConfig::default()
+};
+</code></pre><h2 id="s5-reconciliación-de-cierres">Reconciliación de cierres</h2><p>Una orden se abre y se registra como pendiente. Si su cierre ocurre durante la</p><p>caída, el evento nunca llega; al reconectar la sesión consulta el historial de</p><p>posiciones del balance activo y recupera esos cierres:</p><ul><li>Solo se completan identificadores que esta sesión abrió y siguen pendientes.</li></ul><p>Un cierre ajeno no aparece en la caché del consumidor.</p><ul><li>El resultado se publica como <code>Event::OrderClosed</code>, igual que un cierre</li></ul><p>normal, así que el consumidor no necesita una ruta distinta.</p><ul><li><code>Win</code> lleva la ganancia neta, <code>Loss</code> el importe perdido y <code>Equal</code> el importe</li></ul><p>devuelto, calculados desde el PnL de la posición.</p><p>La consulta es paginada (100 posiciones por página, hasta 10 páginas) y se</p><p>detiene en cuanto encuentra todos los cierres pendientes: una sesión caída</p><p>durante horas no bloquea el despacho recorriendo el historial completo.</p><p>Si el historial no responde, la reconexión continúa y se registra el aviso en</p><p><code>tracing</code>; las órdenes afectadas quedan como estaban.</p><h2 id="s6-qué-no-resuelve">Qué no resuelve</h2><ul><li><strong>Órdenes en vuelo</strong>: se descartan con error y no se reenvían. Una orden</li></ul><p>aceptada por el bróker sí se reconcilia al volver.</p><ul><li><strong>Huecos de datos</strong>: las velas y ticks ocurridos durante la caída no llegan</li></ul><p>por el stream; se recuperan con <code>get_candles</code> o la descarga paginada.</p><ul><li><strong>Cierres fuera de la ventana del historial</strong>: la reconciliación recorre</li></ul><p>hasta 10 páginas de 100 posiciones y se detiene al encontrar lo que busca o</p><p>al recibir una página incompleta. Un cierre más antiguo exige consultar el</p><p>historial con <code>get_position_history</code>.</p><h2 id="s7-observabilidad">Observabilidad</h2><p>Los avisos de reconexión se registran con <code>tracing</code> (<code>warn</code> al perder el</p><p>socket, <code>info</code> al restablecerlo, <code>error</code> si se abandona). El consumidor que</p><p>quiera métricas propias puede contar <code>Disconnected</code> frente a <code>Reconnected</code> y</p><p>usar <code>downtime_ms</code> para medir la indisponibilidad real.</p><h2 id="s8-estado-verificado">Estado verificado</h2><p>La suite viva fuerza la caída del socket y comprueba el ciclo completo:</p><p><code>Disconnected</code>, reconexión, operativa posterior y replay de una suscripción.</p><p>Última ejecución: 1 intento de reconexión, 4.938 ms sin conexión y vela</p><p>recibida tras volver; 34 comprobaciones, 0 fallos.</p><p>El recorrido multi-página tiene prueba con historiales simulados: localiza</p><p>cierres en páginas posteriores, corta al encontrarlos y respeta el límite de</p><p>diez páginas informando lo que quedó pendiente.</p></section></main>
+<aside class="toc">
+  <div class="toc-titulo">En esta página</div>
+  <div id="toc"></div>
+  <div class="toc-bloque">
+    <div class="toc-titulo">Enlaces</div>
+    <a href="https://github.com/ionixcorp/cripsy_binary_API">Repositorio en GitHub ↗</a>
+    <a href="https://github.com/ionixcorp/cripsy_binary_API/tree/master/installation">Instalación</a>
+    <a href="https://github.com/ionixcorp/cripsy_binary_API/tree/master/scripts">Scripts de verificación</a>
+  </div>
+</aside>
+<footer>
+  <span>cripsy_binary_API · v0.2.1 · MIT</span>
+  <a href="https://github.com/ionixcorp/cripsy_binary_API">github.com/ionixcorp/cripsy_binary_API</a>
+  <span>Generado desde Markdown en <code>docs/</code></span>
+</footer>
+<script>
+var DOCS = [{"id":".-01_introduccion","t":"Qué es cripsy_binary_API","g":"01_introduccion.es.md"},{"id":".-02_account-01_sesion_cuentas","t":"Sesión y cuentas","g":"02_account"},{"id":".-03_candle_and_stream-01_historicos","t":"Históricos: límites verificados","g":"03_candle_and_stream"},{"id":".-03_candle_and_stream-02_stream_ticks","t":"Stream en vivo: velas multi-tamaño y ticks","g":"03_candle_and_stream"},{"id":".-03_candle_and_stream-03_fachada_sincrona","t":"Fachada sincrónica e histórico","g":"03_candle_and_stream"},{"id":".-04_digital-01_digital","t":"Opciones digitales","g":"04_digital"},{"id":".-05_binary-01_binary","t":"Opciones clásicas (turbo / binary)","g":"05_binary"},{"id":".-06_blitz-01_blitz","t":"Opciones blitz","g":"06_blitz"},{"id":".-07_herramientas-01_herramientas","t":"Herramientas del proyecto","g":"07_herramientas"},{"id":".-08_indicadores-01_indicadores","t":"Indicadores técnicos del bróker","g":"08_indicadores"},{"id":".-09_reconexion-01_reconexion","t":"Reconexión de sesión","g":"09_reconexion"}];
+var TOCS = {".-01_introduccion":"<a class=\"toc-2\" href=\"#s1-estado-actual\">Estado actual</a><a class=\"toc-2\" href=\"#s2-qué-no-hace\">Qué no hace</a><a class=\"toc-2\" href=\"#s3-cómo-leer-esta-documentación\">Cómo leer esta documentación</a><a class=\"toc-2\" href=\"#s4-requisitos\">Requisitos</a><a class=\"toc-2\" href=\"#s5-limitaciones-conocidas\">Limitaciones conocidas</a>",".-02_account-01_sesion_cuentas":"<a class=\"toc-2\" href=\"#s1-conectar\">Conectar</a><a class=\"toc-2\" href=\"#s2-cuentas-demo-y-real\">Cuentas: demo y real</a><a class=\"toc-2\" href=\"#s3-consultas-disponibles\">Consultas disponibles</a><a class=\"toc-2\" href=\"#s4-notas-importantes\">Notas importantes</a><a class=\"toc-2\" href=\"#s5-eventos-de-comisiones-y-operaciones-de-terceros\">Eventos de comisiones y operaciones de terceros</a>",".-03_candle_and_stream-01_historicos":"<a class=\"toc-2\" href=\"#s1-descargar-toda-la-semana-en-velas-de-1-s\">Descargar toda la semana en velas de 1 s</a><a class=\"toc-2\" href=\"#s2-nota-sobre-densidad-en-histórico\">Nota sobre densidad en histórico</a>",".-03_candle_and_stream-02_stream_ticks":"<a class=\"toc-2\" href=\"#s1-1-velas-en-vivo-subscribe-candles\">1. Velas en vivo (<code>subscribe_candles</code>)</a><a class=\"toc-2\" href=\"#s2-2-ticks-de-precio-event-pricetick\">2. Ticks de precio (<code>Event::PriceTick</code>)</a><a class=\"toc-2\" href=\"#s3-sin-sondeo\">Sin sondeo</a>",".-03_candle_and_stream-03_fachada_sincrona":"<a class=\"toc-2\" href=\"#s1-fachada-sincrona\">Fachada sincrona</a><a class=\"toc-2\" href=\"#s2-ayudante-de-histórico\">Ayudante de histórico</a>",".-04_digital-01_digital":"<a class=\"toc-2\" href=\"#s1-flujo\">Flujo</a><a class=\"toc-2\" href=\"#s2-llamada\">Llamada</a><a class=\"toc-2\" href=\"#s3-resultado\">Resultado</a><a class=\"toc-2\" href=\"#s4-semántica-de-montos\">Semántica de montos</a>",".-05_binary-01_binary":"<a class=\"toc-2\" href=\"#s1-llamada\">Llamada</a><a class=\"toc-2\" href=\"#s2-ciclo-de-vida-por-eventos\">Ciclo de vida por eventos</a><a class=\"toc-2\" href=\"#s3-validaciones-antes-de-enviar\">Validaciones antes de enviar</a>",".-06_blitz-01_blitz":"<a class=\"toc-2\" href=\"#s1-reglas-verificadas\">Reglas verificadas</a><a class=\"toc-2\" href=\"#s2-llamada\">Llamada</a><a class=\"toc-2\" href=\"#s3-rollovers\">Rollovers</a><a class=\"toc-2\" href=\"#s4-estado-actual\">Estado actual</a>",".-07_herramientas-01_herramientas":"<a class=\"toc-2\" href=\"#s1-instalación-guiada\">Instalación guiada</a><a class=\"toc-2\" href=\"#s2-verificación-sin-instalar\">Verificación sin instalar</a><a class=\"toc-2\" href=\"#s3-compuerta-de-calidad\">Compuerta de calidad</a><a class=\"toc-2\" href=\"#s4-regenerar-la-documentación-navegable\">Regenerar la documentación navegable</a><a class=\"toc-2\" href=\"#s5-scripts-listos-para-usar\">Scripts listos para usar</a><a class=\"toc-2\" href=\"#s6-probar-contra-el-bróker\">Probar contra el bróker</a><a class=\"toc-2\" href=\"#s7-agregar-otro-bróker\">Agregar otro bróker</a><a class=\"toc-2\" href=\"#s8-garantía-y-descargo\">Garantía y descargo</a>",".-08_indicadores-01_indicadores":"<a class=\"toc-2\" href=\"#s1-la-respuesta-corta\">La respuesta corta</a><a class=\"toc-2\" href=\"#s2-qué-se-verificó\">Qué se verificó</a><a class=\"toc-2\" href=\"#s3-cómo-usarlo-cuando-esté-disponible\">Cómo usarlo cuando esté disponible</a><a class=\"toc-2\" href=\"#s4-alternativa-calcular-los-tuyos\">Alternativa: calcular los tuyos</a>",".-09_reconexion-01_reconexion":"<a class=\"toc-2\" href=\"#s1-qué-ocurre-cuando-cae-la-conexión\">Qué ocurre cuando cae la conexión</a><a class=\"toc-2\" href=\"#s2-peticiones-durante-la-caída\">Peticiones durante la caída</a><a class=\"toc-2\" href=\"#s3-credenciales-rechazadas\">Credenciales rechazadas</a><a class=\"toc-2\" href=\"#s4-personalización\">Personalización</a><a class=\"toc-2\" href=\"#s5-reconciliación-de-cierres\">Reconciliación de cierres</a><a class=\"toc-2\" href=\"#s6-qué-no-resuelve\">Qué no resuelve</a><a class=\"toc-2\" href=\"#s7-observabilidad\">Observabilidad</a><a class=\"toc-2\" href=\"#s8-estado-verificado\">Estado verificado</a>"};
+function mostrar(id) {
+  var seccion = document.getElementById(id);
+  if (!seccion) { return; }
+  document.querySelectorAll('.pagina').forEach(function(s) { s.classList.remove('activa'); });
+  document.querySelectorAll('.nav-item').forEach(function(a) { a.classList.remove('activo'); });
+  seccion.classList.add('activa');
+  var enlace = document.querySelector('.nav-item[data-id="' + id + '"]');
+  if (enlace) { enlace.classList.add('activo'); enlace.scrollIntoView({ block:'nearest' }); }
+  var caja = document.getElementById('toc');
+  caja.innerHTML = TOCS[id] || '<div class="toc-vacio">Esta página no tiene secciones.</div>';
+  var selector = document.getElementById('menu-movil');
+  if (selector) { selector.value = id; }
+  window.scrollTo(0, 0);
+}
+document.querySelectorAll('.nav-item').forEach(function(a) {
+  a.addEventListener('click', function(e) {
+    e.preventDefault();
+    var id = a.getAttribute('data-id');
+    location.hash = id;
+    mostrar(id);
+  });
+});
+document.getElementById('buscador').addEventListener('input', function(e) {
+  var q = e.target.value.toLowerCase().trim();
+  document.querySelectorAll('.nav-item').forEach(function(a) {
+    var id = a.getAttribute('data-id');
+    var doc = DOCS.find(function(d) { return d.id === id; });
+    var visible = !q || (doc && (doc.t.toLowerCase().includes(q) || doc.g.toLowerCase().includes(q)));
+    a.style.display = visible ? 'block' : 'none';
+  });
+});
+document.getElementById('toc').addEventListener('click', function(e) {
+  var a = e.target.closest('a');
+  if (!a) { return; }
+  e.preventDefault();
+  var destino = document.getElementById(a.getAttribute('href').slice(1));
+  if (destino) { destino.scrollIntoView({ behavior:'smooth', block:'start' }); }
+});
+(function () {
+  var selector = document.getElementById('menu-movil');
+  if (!selector) { return; }
+  DOCS.forEach(function(d) {
+    var opcion = document.createElement('option');
+    opcion.value = d.id;
+    opcion.textContent = d.t;
+    selector.appendChild(opcion);
+  });
+  selector.addEventListener('change', function () {
+    location.hash = selector.value;
+    mostrar(selector.value);
+  });
+})();
+window.addEventListener('hashchange', function () {
+  mostrar(location.hash.replace('#','') || '.-01_introduccion');
+});
+var primero = '.-01_introduccion';
+if (location.hash) { mostrar(location.hash.replace('#','')); } else { mostrar(primero); }
+</script>
+</body>
+</html>
