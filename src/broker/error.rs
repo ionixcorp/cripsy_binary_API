@@ -15,6 +15,13 @@ pub enum BrokerError {
     #[error("timeout esperando respuesta del bróker")]
     Timeout,
 
+    /// Sin socket operativo: la sesión está reconectando o se cerró.
+    ///
+    /// No se encola la petición a propósito: ejecutarla al volver la conexión
+    /// significaría operar con información de mercado obsoleta.
+    #[error("sin conexión con el bróker: la sesión no tiene socket operativo")]
+    NotConnected,
+
     #[error("el bróker rechazó la operación: {0}")]
     Rejected(String),
 

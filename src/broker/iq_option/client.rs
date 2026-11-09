@@ -199,7 +199,8 @@ impl Broker for IqOptionBroker {
 
         // Stream multi-tamaño: un único canal por símbolo con el tamaño pedido
         // (0 = todos los tamaños).
-        self.enviar_sin_espera(
+        self.suscribir(
+            &format!("velas:{}", req.symbol),
             msg::SUBSCRIBE_MESSAGE,
             &json!({
                 "name": msg::CANDLES_GENERATED,
@@ -408,7 +409,8 @@ impl Broker for IqOptionBroker {
                 })?
         };
         // Ambos canales: el agregado y el específico de binarias.
-        self.enviar_sin_espera(
+        self.suscribir(
+            &format!("live-deals:{symbol}"),
             msg::SUBSCRIBE_MESSAGE,
             &json!({
                 "name": msg::LIVE_DEAL,
@@ -417,7 +419,8 @@ impl Broker for IqOptionBroker {
             }),
         )
         .await?;
-        self.enviar_sin_espera(
+        self.suscribir(
+            &format!("live-deals-bin:{symbol}"),
             msg::SUBSCRIBE_MESSAGE,
             &json!({
                 "name": msg::LIVE_DEAL_BINARY,
@@ -432,7 +435,8 @@ impl Broker for IqOptionBroker {
     async fn subscribe_commission_changes(&self) -> Result<(), BrokerError> {
         // Los tres tipos de opción: el bróker emite por instrumento.
         for instrumento in ["binary-option", "turbo-option", "digital-option"] {
-            self.enviar_sin_espera(
+            self.suscribir(
+                &format!("comision:{instrumento}"),
                 msg::SUBSCRIBE_MESSAGE,
                 &json!({
                     "name": msg::COMMISSION_CHANGED,
@@ -659,7 +663,8 @@ impl Broker for IqOptionBroker {
         };
 
         // Suscripción price-splitter (payout + instrument_id en vivo).
-        self.enviar_sin_espera(
+        self.suscribir(
+            &format!("splitter:{asset_id}"),
             msg::SUBSCRIBE_MESSAGE,
             &json!({
                 "name": msg::PRICE_SPLITTER,

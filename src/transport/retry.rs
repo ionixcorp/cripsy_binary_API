@@ -74,6 +74,7 @@ mod tests {
             max_retries: max,
             backoff_base_ms: 1,
             backoff_max_ms: 4,
+            cola_salida: 64,
             verify_tls: true,
             proxy: None,
             user_agent: None,

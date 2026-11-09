@@ -25,6 +25,7 @@ pub struct PriceTick {
 /// payout en vivo) llega aquí; la consulta por polling (`get_operation_result`)
 /// queda solo como respaldo.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum Event {
     OrderOpened(Operation),
     OrderClosed {
@@ -62,5 +63,20 @@ pub enum Event {
     /// distinguir «me quedé atrás» de «la sesión terminó».
     EventsLost {
         count: u64,
+    },
+    /// La conexión se interrumpió y la sesión inicia la reconexión.
+    ///
+    /// Las peticiones en vuelo se descartan y, mientras no haya socket, las
+    /// llamadas devuelven `BrokerError::NotConnected`. Los streams de velas
+    /// siguen abiertos y se reanudan al restablecerse la sesión.
+    Disconnected {
+        motivo: String,
+    },
+    /// Sesión restablecida: estado, catálogo y suscripciones ya restaurados.
+    Reconnected {
+        /// Intentos de reconexión consumidos (1 = volvió al primer intento).
+        intentos: u32,
+        /// Tiempo total sin conexión, en milisegundos.
+        downtime_ms: u64,
     },
 }

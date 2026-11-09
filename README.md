@@ -219,9 +219,11 @@ devuelve el error del bróker sin sustituirlo por valores estimados.
 
 Limitaciones conocidas de la versión actual:
 
-- **Sin reconexión automática.** El handshake inicial reintenta con backoff,
-  pero si el WebSocket cae la sesión queda desconectada: las peticiones en
-  vuelo terminan con error y hay que reconectar y resuscribir.
+- **Reconexión automática con backoff.** Si el WebSocket cae, la sesión se
+  reautentica, restaura perfil, catálogo y suscripciones, y lo comunica por
+  `Event::Disconnected` / `Event::Reconnected`. Mientras no hay socket, las
+  llamadas devuelven `BrokerError::NotConnected`; las órdenes en vuelo no se
+  reenvían.
 - **`get_operation_result` no consulta al bróker.** Lee la caché de eventos;
   sin el stream activo una orden puede permanecer en `Pending`.
 - **`get_payout` devuelve el payout del catálogo.** El parámetro de expiración

@@ -6,6 +6,7 @@
 //! esperan la respuesta con timeout. Cero polling, cero estado global.
 
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use serde_json::{json, Value};
@@ -28,6 +29,49 @@ pub(crate) struct Saliente {
     request_id: String,
 }
 
+/// Suscripción registrada: se reproduce íntegra tras una reconexión.
+#[derive(Debug, Clone)]
+pub(crate) struct Suscripcion {
+    pub(crate) clave: String,
+    pub(crate) name: String,
+    pub(crate) msg: Value,
+}
+
+/// Motivo con el que el bucle del socket termina por petición del consumidor.
+const MOTIVO_CIERRE: &str = "cierre solicitado";
+
+/// Registra una suscripción si su clave no estaba presente.
+///
+/// Devuelve `true` cuando es nueva (y hay que enviarla), `false` si ya estaba
+/// registrada: el bróker mantiene la suscripción mientras la sesión siga viva.
+fn registrar_suscripcion(
+    lista: &mut Vec<Suscripcion>,
+    clave: &str,
+    name: &str,
+    msg: &Value,
+) -> bool {
+    if lista.iter().any(|s| s.clave == clave) {
+        return false;
+    }
+    lista.push(Suscripcion {
+        clave: clave.to_string(),
+        name: name.to_string(),
+        msg: msg.clone(),
+    });
+    true
+}
+
+/// Siguiente espera del backoff: duplica y satura en `maximo`.
+fn siguiente_espera(actual: u64, maximo: u64) -> u64 {
+    let techo = maximo.max(1);
+    actual.saturating_mul(2).clamp(1, techo)
+}
+
+/// Un rechazo de credenciales no se reintenta: insistir bloquea la cuenta.
+fn es_fatal(e: &BrokerError) -> bool {
+    matches!(e, BrokerError::Authentication(_))
+}
+
 /// Estado mutable de la sesión (solo lo toca la tarea lectora).
 #[derive(Default)]
 pub(crate) struct Estado {
@@ -46,7 +90,11 @@ pub(crate) struct SubVelas {
 /// Adaptador IQ Option.
 pub struct IqOptionBroker {
     config: IqOptionConfig,
-    salida: Option<mpsc::UnboundedSender<Saliente>>,
+    salida: Option<mpsc::Sender<Saliente>>,
+    /// Suscripciones activas, para reproducirlas tras una reconexión.
+    pub(crate) suscripciones: Arc<RwLock<Vec<Suscripcion>>>,
+    /// `true` mientras la tarea del socket tiene un WebSocket operativo.
+    pub(crate) vivo: Arc<AtomicBool>,
     pub(crate) router: Arc<RequestRouter>,
     pub(crate) estado: Arc<RwLock<Estado>>,
     pub(crate) catalogo: Arc<RwLock<Vec<Asset>>>,
@@ -92,7 +140,9 @@ impl IqOptionBroker {
         )
         .await?;
 
-        let (tx_salida, rx_salida) = mpsc::unbounded_channel::<Saliente>();
+        // Cola acotada: con el socket caído el productor espera en vez de
+        // acumular órdenes en memoria; una caída sostenida devuelve error.
+        let (tx_salida, rx_salida) = mpsc::channel::<Saliente>(config.transport.cola_salida.max(1));
         let (tx_eventos, _rx_eventos) = broadcast::channel::<Event>(1024);
         let (tx_precios, _rx_precios) = broadcast::channel::<Value>(512);
         let router = Arc::new(RequestRouter::new());
@@ -103,10 +153,14 @@ impl IqOptionBroker {
             Arc::new(RwLock::new(HashMap::new()));
         let digitales: Arc<RwLock<HashMap<String, OrderId>>> =
             Arc::new(RwLock::new(HashMap::new()));
+        let suscripciones: Arc<RwLock<Vec<Suscripcion>>> = Arc::new(RwLock::new(Vec::new()));
+        let vivo = Arc::new(AtomicBool::new(true));
 
         let broker = Self {
             config,
             salida: Some(tx_salida),
+            suscripciones: suscripciones.clone(),
+            vivo: vivo.clone(),
             router: router.clone(),
             estado: estado.clone(),
             catalogo: catalogo.clone(),
@@ -122,6 +176,9 @@ impl IqOptionBroker {
             ws,
             rx_salida,
             Ctx {
+                config: broker.config.clone(),
+                suscripciones: suscripciones.clone(),
+                vivo: vivo.clone(),
                 router: router.clone(),
                 estado: estado.clone(),
                 catalogo: catalogo.clone(),
@@ -163,7 +220,8 @@ impl IqOptionBroker {
         // ---------- suscripción a cierres de cartera (digital y demás) ----------
         for instrumento in ["digital-option", "binary-option", "trading"] {
             broker
-                .enviar_sin_espera(
+                .suscribir(
+                    &format!("posicion:{instrumento}"),
                     msg::SUBSCRIBE_MESSAGE,
                     &json!({
                         "name": msg::POSITION_CHANGED,
@@ -183,6 +241,11 @@ impl IqOptionBroker {
         msg: &Value,
         _respuesta: &str,
     ) -> Result<Value, BrokerError> {
+        // Sin socket no se encola nada: una orden guardada para más tarde se
+        // ejecutaría contra un mercado distinto al que se decidió.
+        if !self.vivo.load(Ordering::Acquire) {
+            return Err(BrokerError::NotConnected);
+        }
         let (rid, rx) = self.router.register("iq");
         self.salida
             .as_ref()
@@ -192,6 +255,7 @@ impl IqOptionBroker {
                 msg: msg.clone(),
                 request_id: rid.clone(),
             })
+            .await
             .map_err(|_| BrokerError::Internal("canal de salida cerrado".into()))?;
         let plazo = std::time::Duration::from_secs(self.config.timeout_secs);
         match tokio::time::timeout(plazo, rx).await {
@@ -212,6 +276,9 @@ impl IqOptionBroker {
         name: &str,
         msg: &Value,
     ) -> Result<(), BrokerError> {
+        if !self.vivo.load(Ordering::Acquire) {
+            return Err(BrokerError::NotConnected);
+        }
         // Sin receptor: registrar uno que se descarta al instante dejaría una
         // entrada pendiente por cada suscripción.
         let rid = self.router.next_id("iq");
@@ -223,7 +290,33 @@ impl IqOptionBroker {
                 msg: msg.clone(),
                 request_id: rid,
             })
+            .await
             .map_err(|_| BrokerError::Internal("canal de salida cerrado".into()))?;
+        Ok(())
+    }
+
+    /// Registra una suscripción y la envía.
+    ///
+    /// El registro permite reproducirla tras una reconexión; repetir la misma
+    /// clave no genera tráfico duplicado.
+    pub(crate) async fn suscribir(
+        &self,
+        clave: &str,
+        name: &str,
+        msg: &Value,
+    ) -> Result<(), BrokerError> {
+        let nueva = {
+            let reg = self.suscripciones.read().await;
+            !reg.iter().any(|s| s.clave == clave)
+        };
+        if !nueva {
+            return Ok(());
+        }
+        // Primero se envía: si no hay socket, la clave no queda registrada y el
+        // replay no reproduciría una suscripción que nunca llegó al bróker.
+        self.enviar_sin_espera(name, msg).await?;
+        let mut reg = self.suscripciones.write().await;
+        registrar_suscripcion(&mut reg, clave, name, msg);
         Ok(())
     }
 
@@ -270,6 +363,9 @@ fn extraer_ssid(headers: &reqwest::header::HeaderMap, cuerpo: &Value) -> Option<
 
 /// Contexto compartido de la tarea de socket (evita listas de 9 argumentos).
 pub(crate) struct Ctx {
+    pub(crate) config: IqOptionConfig,
+    pub(crate) suscripciones: Arc<RwLock<Vec<Suscripcion>>>,
+    pub(crate) vivo: Arc<AtomicBool>,
     pub(crate) router: Arc<RequestRouter>,
     pub(crate) estado: Arc<RwLock<Estado>>,
     pub(crate) catalogo: Arc<RwLock<Vec<Asset>>>,
@@ -279,14 +375,63 @@ pub(crate) struct Ctx {
     pub(crate) resultados: Arc<RwLock<HashMap<String, OperationResult>>>,
     pub(crate) digitales: Arc<RwLock<HashMap<String, OrderId>>>,
 }
-
 /// Tarea única que posee el socket: lee, escribe y enruta.
-async fn tarea_socket(
-    mut ws: WsClient,
-    mut rx_salida: mpsc::UnboundedReceiver<Saliente>,
-    ctx: Ctx,
-) {
-    let motivo = loop {
+///
+/// Si la conexión cae, reautentica, reconstruye el WebSocket, restaura el
+/// estado y reproduce las suscripciones antes de volver a despachar. El
+/// consumidor recibe `Event::Disconnected` y `Event::Reconnected`, y sus
+/// streams siguen vivos.
+async fn tarea_socket(mut ws: WsClient, mut rx_salida: mpsc::Receiver<Saliente>, ctx: Ctx) {
+    loop {
+        let motivo = bucle_socket(&mut ws, &mut rx_salida, &ctx).await;
+
+        // Cierre ordenado: sin esto las peticiones en vuelo esperarían hasta su
+        // timeout y quedarían registradas hasta que llegara un mensaje tardío.
+        ctx.router.fail_all();
+        ctx.vivo.store(false, Ordering::Release);
+        ctx.estado.write().await.conectado = false;
+        let _ = ctx.eventos.send(Event::Disconnected {
+            motivo: motivo.to_string(),
+        });
+
+        if motivo == MOTIVO_CIERRE {
+            break;
+        }
+
+        tracing::warn!(motivo, "conexión perdida; reintentando");
+        let inicio = tokio::time::Instant::now();
+        let mut intentos = 0u32;
+        match reconectar(&ctx, &mut intentos).await {
+            Ok(nuevo) => {
+                ws = nuevo;
+                ctx.vivo.store(true, Ordering::Release);
+                ctx.estado.write().await.conectado = true;
+                let _ = ctx.eventos.send(Event::Reconnected {
+                    intentos,
+                    downtime_ms: inicio.elapsed().as_millis() as u64,
+                });
+                tracing::info!(intentos, "sesión restablecida");
+            }
+            Err(e) => {
+                tracing::error!(error = %e, "reconexión abandonada");
+                break;
+            }
+        }
+    }
+
+    // Solo al terminar definitivamente: los streams de velas dejan de recibir.
+    ctx.sub_velas.write().await.clear();
+    ctx.suscripciones.write().await.clear();
+    tracing::warn!("sesión cerrada; no habrá más reconexiones");
+}
+
+/// Bucle de despacho mientras el socket esté vivo. Devuelve el motivo de salida.
+async fn bucle_socket(
+    ws: &mut WsClient,
+    rx_salida: &mut mpsc::Receiver<Saliente>,
+    ctx: &Ctx,
+) -> &'static str {
+    loop {
         tokio::select! {
             frame = ws.siguiente() => {
                 match frame {
@@ -296,45 +441,175 @@ async fn tarea_socket(
                                 tracing::debug!(rid, "request_id tardío o desconocido");
                             }
                         }
-                        enrutar_evento(&f, &ctx).await;
+                        enrutar_evento(&f, ctx).await;
                     }
                     Some(Err(e)) => {
                         tracing::warn!(error = %e, "error de lectura del websocket");
-                        break "error de lectura";
+                        return "error de lectura";
                     }
-                    None => {
-                        break "el bróker cerró el socket";
-                    }
+                    None => return "el bróker cerró el socket",
                 }
             }
+
             saliente = rx_salida.recv() => {
                 match saliente {
                     Some(s) => {
                         if let Err(e) = ws.enviar(&s.name, &s.msg, &s.request_id).await {
                             tracing::warn!(error = %e, "error de escritura del websocket");
-                            break "error de escritura";
+                            return "error de escritura";
                         }
                     }
                     None => {
                         let _ = ws.cerrar().await;
-                        break "cierre solicitado";
+                        return MOTIVO_CIERRE;
                     }
                 }
             }
         }
-    };
+    }
+}
 
-    // Cierre ordenado: sin esto, las peticiones en vuelo esperarían hasta su
-    // timeout y las suscripciones quedarían como receptores sin emisor.
-    ctx.router.fail_all();
-    ctx.sub_velas.write().await.clear();
-    ctx.estado.write().await.conectado = false;
-    tracing::warn!(motivo, "sesión sin conexión; no hay reconexión automática");
+/// Inicia sesión y devuelve el `ssid` vigente.
+async fn iniciar_sesion(ctx: &Ctx) -> Result<String, BrokerError> {
+    let http = HttpClient::new(
+        &endpoints::api_base_url(&ctx.config.auth_host),
+        ctx.config.transport.clone(),
+    )?;
+    let (cuerpo, headers) = http
+        .post_json_completo(
+            endpoints::LOGIN_PATH.trim_start_matches('/'),
+            &json!({ "identifier": ctx.config.email, "password": ctx.config.password }),
+        )
+        .await?;
+    extraer_ssid(&headers, &cuerpo)
+        .ok_or_else(|| BrokerError::Authentication("el login no devolvió cookie ssid".into()))
+}
+
+/// Reautentica y restaura estado y suscripciones, con backoff exponencial.
+async fn reconectar(ctx: &Ctx, intentos: &mut u32) -> Result<WsClient, BrokerError> {
+    let cfg = &ctx.config.transport;
+    let mut espera = siguiente_espera(0, cfg.backoff_base_ms.max(1));
+    let mut ssid: Option<String> = None;
+
+    loop {
+        tokio::time::sleep(std::time::Duration::from_millis(espera)).await;
+        *intentos += 1;
+
+        let credencial = match ssid.clone() {
+            Some(s) => Ok(s),
+            None => iniciar_sesion(ctx).await,
+        };
+        match credencial {
+            Ok(sesion) => match abrir_y_restaurar(ctx, &sesion).await {
+                Ok(ws) => return Ok(ws),
+                Err(e) if es_fatal(&e) => return Err(e),
+                Err(e) => {
+                    // La sesión anterior pudo caducar: el próximo intento loguea.
+                    tracing::warn!(error = %e, "no se pudo restaurar la sesión");
+                    ssid = None;
+                }
+            },
+            Err(e) if es_fatal(&e) => return Err(e),
+            Err(e) => tracing::warn!(error = %e, "login fallido durante la reconexión"),
+        }
+        espera = siguiente_espera(espera, cfg.backoff_max_ms);
+    }
+}
+
+/// Abre el WebSocket con el `ssid` dado y restaura perfil, catálogo y suscripciones.
+async fn abrir_y_restaurar(ctx: &Ctx, ssid: &str) -> Result<WsClient, BrokerError> {
+    let mut ws = WsClient::connect_con_reintentos(
+        &endpoints::ws_url(&ctx.config.ws_host),
+        vec![("Cookie".to_string(), format!("ssid={ssid}"))],
+        ctx.config.transport.clone(),
+    )
+    .await?;
+
+    let plazo = std::time::Duration::from_secs(ctx.config.timeout_secs);
+    let perfil = solicitar_directo(&mut ws, ctx, msg::SSID, &json!(ssid), plazo).await?;
+    let (session, balances) = mapper::sesion_desde_perfil(&perfil, &ctx.config.account)
+        .ok_or_else(|| BrokerError::Rejected("profile sin balances utilizables".into()))?;
+    {
+        let mut e = ctx.estado.write().await;
+        e.session = Some(session);
+        e.balances = balances;
+    }
+
+    let init = solicitar_directo(
+        &mut ws,
+        ctx,
+        msg::SEND_MESSAGE,
+        &json!({ "name": msg::GET_INITIALIZATION_DATA, "version": "3.0", "body": {} }),
+        plazo,
+    )
+    .await?;
+    {
+        let mut c = ctx.catalogo.write().await;
+        *c = mapper::catalogo_desde_init(&init);
+    }
+
+    // Reproducción íntegra: sin esto el bróker dejaría de emitir velas, precios
+    // y cierres de posiciones para esta sesión.
+    let pendientes = ctx.suscripciones.read().await.clone();
+    for sub in pendientes {
+        let rid = ctx.router.next_id("iq");
+        ws.enviar(&sub.name, &sub.msg, &rid).await?;
+    }
+    Ok(ws)
+}
+
+/// Petición correlacionada sobre un socket que aún no tiene tarea de despacho.
+///
+/// Mientras espera la respuesta sigue enrutando lo que llegue (time-sync,
+/// eventos), para no perder mensajes durante la reautenticación.
+async fn solicitar_directo(
+    ws: &mut WsClient,
+    ctx: &Ctx,
+    name: &str,
+    msg: &Value,
+    plazo: std::time::Duration,
+) -> Result<Value, BrokerError> {
+    let (rid, mut rx) = ctx.router.register("iq");
+    ws.enviar(name, msg, &rid).await?;
+    let limite = tokio::time::Instant::now() + plazo;
+    loop {
+        tokio::select! {
+            respuesta = &mut rx => {
+                return respuesta.map_err(|_| BrokerError::Internal("respuesta descartada".into()));
+            }
+            frame = ws.siguiente() => {
+                match frame {
+                    Some(Ok(f)) => {
+                        if f.request_id.as_deref() == Some(rid.as_str()) {
+                            return Ok(f.msg);
+                        }
+                        if let Some(otro) = f.request_id.as_deref() {
+                            let _ = ctx.router.deliver(Some(otro), f.msg.clone());
+                        }
+                        enrutar_evento(&f, ctx).await;
+                    }
+                    Some(Err(e)) => return Err(BrokerError::Transport(e)),
+                    None => {
+                        return Err(BrokerError::Connection(
+                            "el socket se cerró durante la reautenticación".into(),
+                        ))
+                    }
+                }
+            }
+            _ = tokio::time::sleep_until(limite) => {
+                ctx.router.discard(&rid);
+                return Err(BrokerError::Timeout);
+            }
+        }
+    }
 }
 
 /// Enruta un frame al estado, a las suscripciones o al bus de eventos.
 async fn enrutar_evento(frame: &crate::transport::websocket::WsFrame, ctx: &Ctx) {
     let Ctx {
+        config: _,
+        suscripciones: _,
+        vivo: _,
         router: _,
         estado,
         catalogo,
@@ -568,6 +843,9 @@ mod tests {
         let resultados = Arc::new(RwLock::new(HashMap::new()));
         CtxPrueba {
             ctx: Ctx {
+                config: IqOptionConfig::default(),
+                suscripciones: Arc::new(RwLock::new(Vec::new())),
+                vivo: Arc::new(AtomicBool::new(true)),
                 router: Arc::new(RequestRouter::new()),
                 estado: Arc::new(RwLock::new(Estado::default())),
                 catalogo: Arc::new(RwLock::new(Vec::new())),
@@ -630,5 +908,43 @@ mod tests {
             rx.try_recv().is_err(),
             "no debe emitirse un segundo OrderClosed"
         );
+    }
+
+    /// El registro de suscripciones alimenta el replay: no admite duplicados.
+    #[test]
+    fn registro_de_suscripciones_no_duplica_claves() {
+        let mut lista = Vec::new();
+        assert!(registrar_suscripcion(
+            &mut lista,
+            "velas:EURUSD",
+            "subscribeMessage",
+            &json!({"name": "candles-generated"})
+        ));
+        assert!(!registrar_suscripcion(
+            &mut lista,
+            "velas:EURUSD",
+            "subscribeMessage",
+            &json!({"name": "candles-generated"})
+        ));
+        assert_eq!(lista.len(), 1);
+        assert_eq!(lista[0].clave, "velas:EURUSD");
+    }
+
+    /// El backoff arranca en 1 ms, duplica y satura en el techo configurado.
+    #[test]
+    fn backoff_duplica_y_satura() {
+        assert_eq!(siguiente_espera(0, 8_000), 1);
+        assert_eq!(siguiente_espera(1, 8_000), 2);
+        assert_eq!(siguiente_espera(4_000, 8_000), 8_000);
+        assert_eq!(siguiente_espera(8_000, 8_000), 8_000);
+        assert_eq!(siguiente_espera(8_000, 0), 1);
+    }
+
+    /// Un fallo de credenciales es terminal; uno de red se reintenta.
+    #[test]
+    fn solo_la_autenticacion_es_fatal() {
+        assert!(es_fatal(&BrokerError::Authentication("rechazado".into())));
+        assert!(!es_fatal(&BrokerError::Connection("cortado".into())));
+        assert!(!es_fatal(&BrokerError::Timeout));
     }
 }

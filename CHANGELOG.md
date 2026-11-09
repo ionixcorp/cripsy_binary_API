@@ -3,10 +3,24 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/)
 y versionado semántico.
 
-## [Sin publicar]
+## [0.2.0] - 2026-11-09
 
 ### Añadido
 
+- Reconexión automática de la sesión: tras una caída del WebSocket la tarea
+  del socket reautentica, restaura perfil, balances y catálogo, y reproduce
+  las suscripciones antes de volver a despachar. Backoff exponencial con
+  saturación; un rechazo de credenciales no se reintenta.
+- `Event::Disconnected { motivo }` y `Event::Reconnected { intentos,
+  downtime_ms }` para que el consumidor distinga una caída de un cierre.
+- Registro de suscripciones (velas, live-deals, comisiones, price-splitter y
+  cierres de posición) que se usa como fuente del replay.
+- `BrokerError::NotConnected`: las llamadas fallan de inmediato mientras no
+  haya socket, en vez de encolarse para ejecutarse con datos obsoletos.
+- `TransportConfig::cola_salida` (256 por defecto): capacidad de la cola de
+  salida del socket.
+- `docs/09_reconexion/01_reconexion.es.md` con el diseño y los límites del
+  supervisor de sesión.
 - `Broker::buy_blitz` con `BuyBlitzRequest`: la duración viaja en segundos y el
   payout se puede indicar de forma explícita. `buy_binary` deja de transportar
   segundos en `expiration_minutes` y delega el blitz en la nueva petición.
@@ -35,6 +49,15 @@ y versionado semántico.
 - Documentación corregida: `get_operation_result` lee la caché local (no hace
   consulta remota), `get_payout` devuelve el payout del catálogo y la densidad
   de ticks se describe con la medición real, sin afirmar ausencia de límite.
+
+### Cambiado (incompatible)
+
+- `Event` pasa a ser `#[non_exhaustive]` e incorpora variantes nuevas: los
+  `match` exhaustivos sobre `Event` deben añadir un brazo `_`.
+- La cola de salida del socket deja de ser ilimitada; una ráfaga superior a
+  `TransportConfig::cola_salida` aplica presión al productor.
+- Migración: sustituir los `match` exhaustivos sobre `Event` y, si se construye
+  `TransportConfig` con literal de struct, añadir `cola_salida`.
 
 ## [0.1.0] - 2026-11-08
 

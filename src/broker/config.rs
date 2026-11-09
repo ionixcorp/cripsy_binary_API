@@ -51,6 +51,11 @@ pub struct TransportConfig {
     pub max_retries: u32,
     pub backoff_base_ms: u64,
     pub backoff_max_ms: u64,
+    /// Capacidad de la cola de salida del socket.
+    ///
+    /// Acotada a propósito: si el bróker no consume, el productor espera (o
+    /// falla) en vez de acumular órdenes en memoria.
+    pub cola_salida: usize,
     /// Verificación TLS real; `false` solo para pruebas documentadas.
     pub verify_tls: bool,
     pub proxy: Option<String>,
@@ -69,6 +74,7 @@ impl Default for TransportConfig {
             max_retries: 5,
             backoff_base_ms: 250,
             backoff_max_ms: 8_000,
+            cola_salida: 256,
             verify_tls: true,
             proxy: None,
             user_agent: None,

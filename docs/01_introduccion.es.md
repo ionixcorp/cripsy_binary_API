@@ -57,6 +57,7 @@ Todas las llamadas del trait `Broker` son `async` y devuelven
 | 06 · Blitz | Órdenes blitz y rollovers |
 | 07 · Herramientas | Instalación, verificación y cómo añadir otro bróker |
 | 08 · Indicadores | Indicadores del bróker: estado y alternativas |
+| 09 · Reconexión | Supervisión de sesión, replay de suscripciones y límites |
 
 ## Requisitos
 
@@ -66,10 +67,15 @@ Todas las llamadas del trait `Broker` son `async` y devuelven
 
 ## Limitaciones conocidas
 
-- **Sin reconexión automática**: si el WebSocket cae, la sesión queda
-  desconectada (`is_connected()` devuelve `false`), las peticiones en vuelo
-  terminan con error y el consumidor debe reconectar y volver a suscribirse.
-  El handshake inicial sí reintenta con backoff.
+- **Reconexión automática (0.2.0)**: si el WebSocket cae, la sesión
+  reautentica, restaura perfil, catálogo y suscripciones, y lo informa con
+  `Event::Disconnected` y `Event::Reconnected { intentos, downtime_ms }`.
+  Mientras no hay socket, las llamadas devuelven `BrokerError::NotConnected`.
+- **Órdenes en vuelo**: se descartan con error y no se reenvían al reconectar;
+  reenviarlas significaría operar con un mercado distinto al decidido.
+- **Huecos de stream**: la reproducción restablece las suscripciones, pero los
+  datos ocurridos durante la caída se recuperan con el histórico, no por el
+  stream.
 - **Resultado de operación desde caché**: `get_operation_result` lee la caché
   alimentada por eventos; no consulta al bróker. Sin el stream activo, una orden
   puede quedarse en `Pending`.
