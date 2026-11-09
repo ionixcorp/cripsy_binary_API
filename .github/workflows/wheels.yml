@@ -9,15 +9,25 @@ permissions:
   contents: write
 
 jobs:
-  linux-x64:
-    name: Wheel (linux-x64)
-    runs-on: ubuntu-latest
+  linux:
+    name: Wheel (${{ matrix.plataforma }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            plataforma: linux-x64
+            imagen: quay.io/pypa/manylinux2014_x86_64:latest
+          - os: ubuntu-24.04-arm
+            plataforma: linux-arm64
+            imagen: quay.io/pypa/manylinux2014_aarch64:latest
     steps:
       - uses: actions/checkout@v4
-      - name: Construir manylinux2014 x86_64
+      - name: Construir manylinux2014
         run: |
           docker run --rm -v "$PWD:/io" -w /io \
-            quay.io/pypa/manylinux2014_x86_64:latest \
+            ${{ matrix.imagen }} \
             bash -c '
               set -euo pipefail
               curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
@@ -27,7 +37,7 @@ jobs:
             '
       - uses: actions/upload-artifact@v4
         with:
-          name: wheels-linux-x64
+          name: wheels-${{ matrix.plataforma }}
           path: dist/*.whl
 
   wheels:
@@ -37,8 +47,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-24.04-arm
-            plataforma: linux-arm64
           - os: windows-latest
             plataforma: windows-x64
           - os: windows-11-arm
@@ -75,7 +83,7 @@ jobs:
   release:
     name: Adjuntar al release
     if: startsWith(github.ref, 'refs/tags/')
-    needs: [wheels, linux-x64, sdist]
+    needs: [wheels, linux, sdist]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -92,7 +100,7 @@ jobs:
   # publish:
   #   name: Publicar en PyPI
   #   if: startsWith(github.ref, 'refs/tags/')
-  #   needs: [wheels, linux-x64, sdist]
+  #   needs: [wheels, linux, sdist]
   #   runs-on: ubuntu-latest
   #   steps:
   #     - uses: actions/download-artifact@v4
