@@ -94,8 +94,9 @@ jobs:
         with:
           files: dist/*
 
-  # Publicacion en PyPI: pendiente de configurar el secreto PYPI_API_TOKEN.
-  # Cuando exista, descomentar este job (o usar trusted publishing con OIDC).
+  # Publicacion en PyPI: 0.3.1 se subio manualmente con MATURIN_PYPI_TOKEN.
+  # Para automatizarla, configurar el secreto PYPI_API_TOKEN y descomentar
+  # este job (o usar trusted publishing con OIDC).
   #
   # publish:
   #   name: Publicar en PyPI

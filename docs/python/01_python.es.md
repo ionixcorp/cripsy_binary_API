@@ -20,11 +20,10 @@ gana dependencias**: `cargo add cripsy-binary-api` sigue igual.
 |---|---|
 | crates.io (`cripsy-binary-api` 0.3.1) | Publicado y verificado |
 | GitHub Release `v0.3.1` | Wheels Linux x64/arm64, Windows x64/arm64, macOS Intel/arm64 y sdist |
-| PyPI | Publicación de 0.3.1 en curso |
+| PyPI | Publicado y verificado: seis wheels y sdist |
 
-El wheel es `abi3` para CPython 3.10 o superior. Mientras PyPI no tenga el
-paquete, las dos formas reales de instalar son el wheel del release y la
-instalación desde el repositorio.
+El wheel es `abi3` para CPython 3.10 o superior. El paquete ya está en PyPI;
+también puedes instalar el wheel del release o compilar desde el repositorio.
 
 ## Instalación
 
@@ -52,10 +51,10 @@ pip install "cripsy-binary-api @ git+https://github.com/ionixcorp/cripsy_binary_
 pip instala maturin como backend de build y compila el módulo. Requiere Rust y
 un compilador C instalados.
 
-### Cuando el paquete esté en PyPI
+### Desde PyPI
 
 ```powershell
-pip install cripsy-binary-api
+pip install cripsy-binary-api==0.3.1
 ```
 
 ## Uso
@@ -159,7 +158,8 @@ python -m pip install --force-reinstall python/dist/*.whl
 python python/smoke_deriv.py
 ```
 
-El workflow `.github/workflows/wheels.yml` construye wheels para Linux, Windows
-y macOS, más el sdist, y los adjunta al release al empujar una etiqueta `v*`.
-La publicación en PyPI está preparada pero desactivada hasta que exista el
-secreto `PYPI_API_TOKEN`.
+El workflow `.github/workflows/wheels.yml` construye seis wheels (Linux x64 y
+arm64, Windows x64 y arm64, macOS Intel y arm64) más el sdist, y adjunta los
+siete archivos al release al empujar una etiqueta `v*`. La subida a PyPI de
+0.3.1 se hizo con `MATURIN_PYPI_TOKEN`; el job automático sigue desactivado
+hasta configurar `PYPI_API_TOKEN` como secreto del repositorio.

@@ -198,12 +198,20 @@ El repositorio incluye un binding PyO3/maturin con la misma superficie para
 IQ Option y Deriv. El crate de crates.io no cambia: el binding es un paquete
 independiente en `python/`.
 
+Desde PyPI:
+
+```powershell
+pip install cripsy-binary-api==0.3.1
+```
+
+O instala el wheel de tu plataforma desde el release:
+
 ```powershell
 pip install https://github.com/ionixcorp/cripsy_binary_API/releases/download/v0.3.1/cripsy_binary_api-0.3.1-cp310-abi3-win_amd64.whl
 ```
 
-Hay wheels para Linux x64, Windows x64 y macOS arm64 en el mismo release,
-además del sdist.
+El release incluye seis wheels (Linux x64 y arm64, Windows x64 y arm64, macOS
+Intel y arm64) y el sdist.
 
 ```python
 from cripsy_binary_api import Client
