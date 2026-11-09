@@ -32,7 +32,10 @@ async = [
     "reqwest/rustls-tls",
 ]
 # Fachada sincrona: misma lógica, transporte bloqueante.
+# La fachada envuelve el núcleo async (runtime propio + `block_on`), así que
+# `blocking` implica `async`; no existe un transporte bloqueante alternativo.
 blocking = [
+    "async",
     "dep:tungstenite",
     "dep:reqwest",
     "dep:async-trait",

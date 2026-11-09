@@ -191,7 +191,7 @@ Las propuestas y discusiones se atienden en los issues del repositorio.
 ## 🧪 Calidad
 
 ```powershell
-.\scripts\verify.ps1   # fmt + clippy -D warnings + 61 tests + build blocking + docs
+.\scripts\verify.ps1   # fmt + clippy -D warnings + 64 tests + build blocking + docs
 ```
 
 La compuerta es la misma que se ejecuta en Windows y en Linux. Los tests no

@@ -8,6 +8,12 @@
 //! El núcleo es async; la fachada sincrona (`broker::sync::SyncBroker`, Fase 6)
 //! envuelve este mismo núcleo para consumidores bloqueantes.
 
+#[cfg(not(any(feature = "async", feature = "blocking")))]
+compile_error!(
+    "cripsy-binary-api requiere una feature de consumo: `async` (por defecto) o `blocking`; \
+     sin ellas no hay transporte y el crate no compila."
+);
+
 pub mod broker;
 pub mod compliance;
 pub mod domain;
