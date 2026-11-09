@@ -18,7 +18,7 @@ gana dependencias**: `cargo add cripsy-binary-api` sigue igual.
 
 | Canal | Estado |
 |---|---|
-| crates.io (`cripsy-binary-api` 0.3.2) | Publicado y verificado; el binding Python sigue en 0.3.1 |
+| crates.io (`cripsy-binary-api` 0.3.3) | Publicado y verificado; el binding Python sigue en 0.3.1 |
 | GitHub Release `v0.3.1` | Wheels Linux x64/arm64, Windows x64/arm64, macOS Intel/arm64 y sdist |
 | PyPI (`cripsy-binary-api` 0.3.1) | Publicado y verificado: seis wheels y sdist |
 
@@ -162,7 +162,8 @@ python python/smoke_deriv.py
 ```
 
 El workflow `.github/workflows/wheels.yml` construye seis wheels (Linux x64 y
-arm64, Windows x64 y arm64, macOS Intel y arm64) más el sdist, y adjunta los
-siete archivos al release al empujar una etiqueta `v*`. La subida a PyPI de
-0.3.1 se hizo con `MATURIN_PYPI_TOKEN`; el job automático sigue desactivado
-hasta configurar `PYPI_API_TOKEN` como secreto del repositorio.
+arm64, Windows x64 y arm64, macOS Intel y arm64) más el sdist solo con
+ejecución manual o cuando el tag `v*` coincide con la versión de
+`python/Cargo.toml`. Un tag de solo crate se omite y no adjunta wheels. La
+subida a PyPI de 0.3.1 se hizo con `MATURIN_PYPI_TOKEN`; el job automático sigue
+desactivado hasta configurar `PYPI_API_TOKEN` como secreto del repositorio.

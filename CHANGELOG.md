@@ -3,6 +3,26 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/)
 y versionado semántico.
 
+## [0.3.3] - 2026-11-09
+
+### Cambiado
+
+- Release de alineación de crates.io: el mismo código de `0.3.2` se publica
+  desde un commit limpio, con la documentación revisada y la metadata de
+  procedencia corregida. No hay cambios de API ni de comportamiento.
+- El workflow de wheels solo construye y adjunta artefactos cuando el tag `v*`
+  coincide con la versión de `python/Cargo.toml`; los tags de solo crate se
+  omiten.
+
+### Verificación
+
+- `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`
+  (89 passed), `cargo test --features blocking` (89 passed) y build `blocking`.
+- Documentación navegable: 18 páginas.
+- `cargo package` verificado sin `.env`, `target`, `python/` ni artefactos.
+- `cargo publish` desde el commit limpio; el tag `v0.3.3` no dispara wheels de
+  Python.
+
 ## [0.3.2] - 2026-11-09
 
 ### Añadido

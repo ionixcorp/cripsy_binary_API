@@ -9,8 +9,41 @@ permissions:
   contents: write
 
 jobs:
+  preflight:
+    name: Comprobar tag y versión Python
+    runs-on: ubuntu-latest
+    outputs:
+      publish: ${{ steps.version.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: version
+        name: Comparar tag con python/Cargo.toml
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+            echo "Ejecución manual: se construyen los wheels."
+            exit 0
+          fi
+          tag="${GITHUB_REF_NAME#v}"
+          version="$(sed -n 's/^version = "\([^"]*\)"/\1/p' python/Cargo.toml | head -n 1)"
+          if [ -z "$version" ]; then
+            echo "::error::No se pudo leer la versión de python/Cargo.toml."
+            exit 1
+          fi
+          if [ "$tag" != "$version" ]; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::El tag ${GITHUB_REF_NAME} no coincide con Python ${version}; se omiten los wheels."
+            exit 0
+          fi
+          echo "publish=true" >> "$GITHUB_OUTPUT"
+          echo "Tag ${GITHUB_REF_NAME} coincide con Python ${version}."
+
   linux:
     name: Wheel (${{ matrix.plataforma }})
+    needs: preflight
+    if: needs.preflight.outputs.publish == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -42,6 +75,8 @@ jobs:
 
   wheels:
     name: Wheel (${{ matrix.plataforma }})
+    needs: preflight
+    if: needs.preflight.outputs.publish == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -68,6 +103,8 @@ jobs:
 
   sdist:
     name: Sdist
+    needs: preflight
+    if: needs.preflight.outputs.publish == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -82,8 +119,8 @@ jobs:
 
   release:
     name: Adjuntar al release
-    if: startsWith(github.ref, 'refs/tags/')
-    needs: [wheels, linux, sdist]
+    needs: [preflight, wheels, linux, sdist]
+    if: startsWith(github.ref, 'refs/tags/') && needs.preflight.outputs.publish == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4

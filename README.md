@@ -69,7 +69,7 @@ sin polling.
 
 ## 📌 Estado del proyecto
 
-Versión `0.3.2`. Cada componente se probó mediante conexiones reales contra el
+Versión `0.3.3`. Cada componente se probó mediante conexiones reales contra el
 bróker (cuenta de práctica) el 8 y 9 de noviembre de 2026.
 
 **IQ Option**
