@@ -20,8 +20,8 @@ y versionado semántico.
 - `TransportConfig::cola_salida` (256 por defecto): capacidad de la cola de
   salida del socket.
 - Reconciliación al reconectar: las órdenes abiertas cuyo cierre ocurrió sin
-  conexión se recuperan del historial de posiciones y se publican como
-  `Event::OrderClosed`, sin reenviar nada al bróker.
+  conexión se recuperan del historial de posiciones (paginado, hasta 10 páginas
+  de 100) y se publican como `Event::OrderClosed`, sin reenviar nada al bróker.
 - `IqOptionBroker::simular_caida_de_conexion` (marcado `#[doc(hidden)]`) para
   ejercitar la recuperación en pruebas de resiliencia.
 - La verificación viva incluye una caída forzada del socket con comprobación de

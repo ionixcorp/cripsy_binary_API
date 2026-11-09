@@ -70,6 +70,10 @@ posiciones del balance activo y recupera esos cierres:
 - `Win` lleva la ganancia neta, `Loss` el importe perdido y `Equal` el importe
   devuelto, calculados desde el PnL de la posición.
 
+La consulta es paginada (100 posiciones por página, hasta 10 páginas) y se
+detiene en cuanto encuentra todos los cierres pendientes: una sesión caída
+durante horas no bloquea el despacho recorriendo el historial completo.
+
 Si el historial no responde, la reconexión continúa y se registra el aviso en
 `tracing`; las órdenes afectadas quedan como estaban.
 
@@ -79,9 +83,10 @@ Si el historial no responde, la reconexión continúa y se registra el aviso en
   aceptada por el bróker sí se reconcilia al volver.
 - **Huecos de datos**: las velas y ticks ocurridos durante la caída no llegan
   por el stream; se recuperan con `get_candles` o la descarga paginada.
-- **Cierres fuera de la ventana del historial**: la reconciliación consulta las
-  100 posiciones más recientes; un cierre más antiguo exige consultar el
-  historial con paginación.
+- **Cierres fuera de la ventana del historial**: la reconciliación recorre
+  hasta 10 páginas de 100 posiciones y se detiene al encontrar lo que busca o
+  al recibir una página incompleta. Un cierre más antiguo exige consultar el
+  historial con `get_position_history`.
 
 ## Observabilidad
 

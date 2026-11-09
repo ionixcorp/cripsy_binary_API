@@ -6,6 +6,8 @@
 [![Rust 1.86+](https://img.shields.io/badge/rust-1.86%2B-orange.svg)](https://www.rust-lang.org)
 [![Documentación](https://img.shields.io/badge/docs-GitHub%20Pages-blue.svg)](https://ionixcorp.github.io/cripsy_binary_API/)
 [![CI](https://github.com/ionixcorp/cripsy_binary_API/actions/workflows/ci.yml/badge.svg)](https://github.com/ionixcorp/cripsy_binary_API/actions)
+[![crates.io](https://img.shields.io/crates/v/cripsy-binary-api.svg)](https://crates.io/crates/cripsy-binary-api)
+[![docs.rs](https://img.shields.io/docsrs/cripsy-binary-api.svg)](https://docs.rs/cripsy-binary-api)
 
 Librería cliente en Rust para la API de IQ Option. Proporciona una interfaz para
 la sesión, el catálogo de activos, las velas históricas, el stream de velas y
@@ -104,8 +106,8 @@ reiniciar el bróker ni volver a suscribirse.
 en lugar de encolarse. En opciones binarias, diferir una orden 30 segundos
 cambia el mercado y el resultado.
 - **Órdenes en vuelo**: se descartan con error y no se reenvían. Un cierre
-ocurrido durante la caída se recupera del historial de posiciones al
-reconectar.
+ocurrido durante la caída se recupera al reconectar recorriendo el historial de
+posiciones, hasta 10 páginas de 100.
 - **Streams**: los que ya tenías siguen siendo válidos y se reanudan solos.
 - **Cola acotada**: `TransportConfig::cola_salida` limita lo pendiente de
 enviar; si se llena, el productor espera en vez de crecer en memoria.
@@ -119,7 +121,20 @@ los límites y la personalización están en
 
 ## 📦 Instalación
 
-Instalación desde el repositorio:
+Desde crates.io:
+
+```powershell
+cargo add cripsy-binary-api
+```
+
+O en `Cargo.toml`:
+
+```toml
+[dependencies]
+cripsy-binary-api = "0.2"
+```
+
+Instalación desde el repositorio (para desarrollo o para probar `master`):
 
 ```powershell
 git clone https://github.com/ionixcorp/cripsy_binary_API.git

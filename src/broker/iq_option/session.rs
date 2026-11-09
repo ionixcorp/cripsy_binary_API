@@ -588,9 +588,41 @@ async fn abrir_y_restaurar(ctx: &Ctx, ssid: &str) -> Result<WsClient, BrokerErro
 
     // Reconciliación: un cierre ocurrido sin conexión no llegó por evento. El
     // historial de posiciones es la única fuente disponible para recuperarlo.
-    if let Ok(historial) = pedir_historial(&mut ws, ctx, plazo).await {
-        let pendientes = ctx.abiertas.read().await.clone();
-        for (id, result) in reconciliar(&pendientes, &historial) {
+    reconciliar_pendientes(&mut ws, ctx, plazo).await;
+    Ok(ws)
+}
+
+/// Páginas de historial que se recorren al reconciliar.
+const PÁGINAS_RECONCILIACION: usize = 10;
+/// Tamaño de página del historial (límite del bróker).
+const POSICIONES_POR_PAGINA: usize = 100;
+
+/// Recupera los cierres de las órdenes abiertas recorriendo el historial.
+///
+/// Se detiene al encontrar todas, al recibir una página incompleta o al agotar
+/// [`PÁGINAS_RECONCILIACION`]: una sesión que estuvo caída durante horas no
+/// debe recorrer el historial completo antes de reanudar el despacho.
+async fn reconciliar_pendientes(ws: &mut WsClient, ctx: &Ctx, plazo: std::time::Duration) {
+    let mut faltan = ctx.abiertas.read().await.clone();
+    if faltan.is_empty() {
+        return;
+    }
+
+    for pagina in 0..PÁGINAS_RECONCILIACION {
+        let offset = pagina * POSICIONES_POR_PAGINA;
+        let historial = match pedir_historial(ws, ctx, plazo, offset).await {
+            Ok(h) => h,
+            Err(e) => {
+                tracing::warn!(error = %e, offset, "sin historial: reconciliación incompleta");
+                return;
+            }
+        };
+        if historial.positions.is_empty() {
+            return;
+        }
+        let ultima_pagina = historial.positions.len() < POSICIONES_POR_PAGINA;
+
+        for (id, result) in reconciliar(&faltan, &historial) {
             let nuevo = {
                 let mut cache = ctx.resultados.write().await;
                 if cache.contains_key(&id) {
@@ -601,14 +633,27 @@ async fn abrir_y_restaurar(ctx: &Ctx, ssid: &str) -> Result<WsClient, BrokerErro
                 }
             };
             ctx.abiertas.write().await.remove(&id);
+            faltan.remove(&id);
             if nuevo {
                 let _ = ctx.eventos.send(Event::OrderClosed { id, result });
             }
         }
-    } else {
-        tracing::warn!("sin historial de posiciones: no se pudo reconciliar");
+
+        if faltan.is_empty() {
+            return;
+        }
+        if ultima_pagina {
+            tracing::warn!(
+                pendientes = faltan.len(),
+                "cierres no encontrados en el historial"
+            );
+            return;
+        }
     }
-    Ok(ws)
+    tracing::warn!(
+        pendientes = faltan.len(),
+        "reconciliación agotada sin coincidencias"
+    );
 }
 
 /// Historial de posiciones cerradas del balance activo.
@@ -616,6 +661,7 @@ async fn pedir_historial(
     ws: &mut WsClient,
     ctx: &Ctx,
     plazo: std::time::Duration,
+    offset: usize,
 ) -> Result<PositionHistory, BrokerError> {
     let balance_id = ctx
         .estado
@@ -632,8 +678,8 @@ async fn pedir_historial(
             "name": msg::PORTFOLIO_GET_HISTORY,
             "body": {
                 "instrument_types": ["turbo-option", "binary-option", "digital-option"],
-                "limit": 100,
-                "offset": 0,
+                "limit": POSICIONES_POR_PAGINA,
+                "offset": offset,
                 "start": 0,
                 "end": 0,
                 "user_balance_id": balance_id
@@ -642,7 +688,7 @@ async fn pedir_historial(
         plazo,
     )
     .await?;
-    mapper::historial_desde_positions(&respuesta, 0)
+    mapper::historial_desde_positions(&respuesta, offset)
         .ok_or_else(|| BrokerError::Rejected("historial sin positions".into()))
 }
 
